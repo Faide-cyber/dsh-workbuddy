@@ -1,0 +1,13 @@
+# Register the WorkBuddy provider without changing the profile's current
+# default model. The plugin reuses the WorkBuddy desktop app's sign-in; no
+# separate OAuth flow is started. Both the international and the domestic
+# route are registered by the plugin itself.
+#
+# Default policy: only models the product configuration prices x0.00.
+# Switch to `modelScope: all` in Settings → Plugins to list paid models too.
+- insert:
+    - id: llm-workbuddy
+      name: dsh-workbuddy
+      config:
+        probeConsent: false
+        modelScope: free

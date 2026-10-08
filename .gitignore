@@ -1,0 +1,9 @@
+node_modules
+*.tgz
+.DS_Store
+.npmrc
+.worktmp
+coverage
+logs
+ci-logs
+*.log
