@@ -18,9 +18,18 @@
 
 - **Sign-in**: per-region browser OAuth — the desktop app is not needed; an existing desktop credential can still be imported read-only
 - **Accounts**: region-isolated multi-account list, explicit switching, credit display; the plugin keeps its own copy separate from the desktop auth files
-- **Domestic one-click**: daily check-in, the cat's growth trip, and every growth-center task (签到 / 猫猫旅行) collected in one action — auto check-in is optional and off by default
-- **Live pricing**: every model is listed and priced by its own region's live catalog, so new models and price changes show up without a plugin release
-- **Providers**: `workbuddy-ai` (international) and `workbuddy-cn` (domestic) — a provider only shows up in the model list once you have signed in to that region
+- **One-click check-in**: daily check-in, the cat's growth trip, and every growth-center task (签到 / 猫猫旅行) collected in one action — auto check-in is optional and off by default
+- **The two regions stay strangers**: each keeps its own credential, its own catalog and its own credit balance; an empty region stays empty rather than borrowing the other one's lineup, and switching accounts never touches in-flight requests
+- **Nothing is done to your desktop app**: its login state is only ever read, never written; the plugin stores its own per-region credential copies, and Disconnect deletes only those
+
+<p align="center">
+  <img src="./docs/card-accounts.png" alt="DSH WorkBuddy settings card: accounts and credits" width="46%">
+  <img src="./docs/card-models.png" alt="DSH WorkBuddy settings card: model scope and switches" width="46%">
+</p>
+
+<p align="center">
+  <img src="./docs/model-picker.png" alt="Picking a WorkBuddy model in the DSH model selector" width="92%">
+</p>
 
 ## Quick start
 
@@ -68,23 +77,6 @@ The desktop app's `workbuddy-desktop-ai.info` (international) and `workbuddy-des
 The settings card lists every imported account. Switching only affects subsequent requests; in-flight requests keep using the original account, and bulk credit/check-in operations do not change the current selection.
 
 **Disconnect** / `logout` only deletes that region's own plugin credentials; the desktop app is untouched.
-
-## Models and prices
-
-Each region is listed and priced **from its own live catalog** — the same endpoint the official CLI reads:
-
-| Region | Endpoint |
-|---|---|
-| International | `GET https://www.workbuddy.ai/v3/config` |
-| Domestic | `GET https://copilot.tencent.com/v3/config` |
-
-Whatever the endpoint currently quotes in `credits` is exactly what the card and the picker show. There is no local price table: a model added or repriced upstream appears without a plugin release, and nothing is quoted from a stale list.
-
-A region with no answer yet shows an empty list on purpose — a region never borrows the other region's lineup.
-
-The catalog's `credits` values are the **displayed** price, after any active promotion. A limited-time free tier therefore reads `x0.00` for as long as it runs, and returns to the paid rate afterwards. `hy4-preview` is the common example: it reads `x0.00` while its "Free now" promotion is active and `x0.29` outside it. The plugin mirrors whatever the region publishes rather than second-guessing it.
-
-The settings card can switch the scope to **All models**. Paid models show their multiplier after the name, and selecting one really does burn credits.
 
 ## Configuration
 

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.7] - 2026-10-09
+
+### Changed
+
+- Both READMEs gained three UI screenshots (accounts and credits, model scope and switches, the model picker), placed above Quick start, with the assets under `docs/`.
+- Highlight 3 was renamed from "Domestic one-click" to "One-click check-in"; its wording is unchanged.
+- Highlights 4 and 5 were rewritten into two more distinctive ones: **the two regions stay strangers** (each keeps its own credential, its own catalog and its own balance; an empty region stays empty rather than borrowing the other one's lineup; switching accounts never touches in-flight requests) and **nothing is done to your desktop app** (its login state is only ever read, never written; the plugin stores its own per-region credential copies and Disconnect deletes only those). The former "live pricing" and "providers" entries are no longer listed as highlights.
+- The "Models and prices" section was removed from both READMEs (the implementation is unchanged).
+- `docs` joined the npm package's `files`, so the README screenshots work inside the tarball too.
+
 ## [1.0.6] - 2026-10-09
 
 ### Fixed
