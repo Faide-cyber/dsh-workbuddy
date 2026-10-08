@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-10-09
+
+### Fixed
+
+- Added a domestic/international region switch to the signed-out view; previously only a domestic login could be started, leaving the international provider with no entry point.
+- Connect no longer opens the login page twice. The host and the card each opened a tab, and both raced for the same single-use login state — the first won, the second showed the site's "login link incomplete" error. Only the host opens it now; the card keeps its "Open login page" link as a fallback.
+
 ## [1.0.1] - 2026-10-09
 
 ### Fixed

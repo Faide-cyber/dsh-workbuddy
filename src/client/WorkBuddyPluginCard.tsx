@@ -535,7 +535,11 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
       setError(undefined)
       setAuthUrl(result.authUrl)
       setWaitingLogin(true)
-      window.open(result.authUrl, '_blank', 'noopener,noreferrer')
+      // The host already opened this URL (openAuthUrl in oauth.ts). Opening it a
+      // second time here raced the two tabs against one single-use login state:
+      // whichever loaded first consumed it, and the other showed the site's
+      // "login link incomplete" failure. One opener only; the `openLogin` link
+      // below stays as the fallback when the platform browser helper fails.
     } finally {
       if (mounted.current) setBusy(false)
     }
@@ -706,6 +710,21 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
             {status !== undefined && status.status !== 'error' && !signedIn
               ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* The signed-out block needs its own region picker. It used to
+                      have none, so `cardRegion` fell back to the default tab and
+                      Connect always started a domestic login — the international
+                      provider had no way in until it was already signed in. */}
+                  {fixedRegion !== undefined || regionRows.length === 0
+                    ? null
+                    : (
+                      <div style={tabBarStyle} role="tablist" aria-label={t('regionGlobal')}>
+                        {(['cn', 'global'] as const).map(region => (
+                          <button key={region} type="button" role="tab" aria-selected={cardRegion === region} style={cardRegion === region ? { ...tabStyle, ...tabActiveStyle } : tabStyle} onClick={() => { setRegionTab(region) }}>
+                            {region === 'global' ? t('regionGlobal') : t('regionCn')}
+                          </button>
+                        ))}
+                      </div>
+                     )}
                   <div style={rowStyle}>
                     <span style={statusStyle}>{waitingLogin ? t('connecting') : t('signedOut')}</span>
                     <span style={{ display: 'flex', gap: 8 }}>
