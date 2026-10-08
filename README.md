@@ -75,7 +75,7 @@ Each region is listed and priced **from its own live catalog** — the same endp
 
 | Region | Endpoint |
 |---|---|
-| International | `GET https://www.workbuddy.ai/v2/enterprises/personal/models` |
+| International | `GET https://www.workbuddy.ai/v3/config` |
 | Domestic | `GET https://copilot.tencent.com/v3/config` |
 
 Whatever the endpoint currently quotes in `credits` is exactly what the card and the picker show. There is no local price table: a model added or repriced upstream appears without a plugin release, and nothing is quoted from a stale list.

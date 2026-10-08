@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.6] - 2026-10-09
+
+### 修复
+
+- 国际版重新列出 `deepseek-v4.1-flash`（`x0.00`）。1.0.5 删除本地兜底名单后，国际版改由 `/v2/enterprises/personal/models` 取目录，而该接口是一份**残缺视图**——它不返回 `deepseek-v4.1-flash`，还把 `hy4-preview` 报成 `x0.00`（促销态）。现在国际版与国际版 App 读同一个接口 `GET https://www.workbuddy.ai/v3/config`，该方法还一并带回 `gpt-6-astra`、`glm-5.3-flash`、`kimi-k2.8-preview`。旧的 `/v2/enterprises/personal/models` 保留为兜底路径，仅当 `/v3/config` 不可用时才使用。
+
 ## [1.0.5] - 2026-10-09
 
 ### 变更

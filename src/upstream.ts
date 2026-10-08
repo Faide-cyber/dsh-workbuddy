@@ -5,10 +5,11 @@
  * Two deployment-specific facts drive this module, and both are the reason the
  * plugin exists rather than reusing a domestic-configured route:
  *
- * 1. **The catalog path differs by region.** The overseas deployment serves the
- *    personal model catalog at `/v2/enterprises/personal/models`; the domestic
- *    one serves it at `/console/enterprises/personal/models`. Calling the wrong
- *    one against `www.workbuddy.ai` is not a 404 — the edge answers HTTP 500.
+ * 1. **The catalog path differs by region.** Both regions serve the catalogue
+ *    the app itself reads at `/v3/config`; the older personal-model views live
+ *    at `/v2/enterprises/personal/models` (overseas) and
+ *    `/console/enterprises/personal/models` (domestic). Calling the wrong one
+ *    against `www.workbuddy.ai` is not a 404 — the edge answers HTTP 500.
  *    {@link WorkBuddyUpstreamClient.fetchModels} therefore picks the path from
  *    the credential's own `domain`, so a `.ai` sign-in can never be sent to the
  *    domestic path.
@@ -145,16 +146,24 @@ const CN_BILLING_BASE = 'https://www.codebuddy.cn'
 const GLOBAL_BASE = 'https://www.workbuddy.ai'
 
 /**
- * Personal model-catalog paths per region, preferred first.
+ * Model-catalog paths per region, preferred first.
  *
- * The domestic `/v3/config` is the catalog the app itself reads: its `cli`
- * roster carries the free `hy4-preview-f` slot at `x0.00`. The legacy
- * personal-models path is the CLI-channel roster, whose second slot is the
- * *paid* `hy4-preview` (`x0.29`) under the same display name "Hy4 preview" —
- * real, but the wrong price list to build a picker from. Keep it as fallback.
+ * `/v3/config` is the catalog the app itself reads, in both regions, and it is
+ * the only one that is complete:
+ *
+ * - Domestic: its `cli` roster carries the free `hy4-preview-f` slot at
+ *   `x0.00`; the legacy personal-models path returns the *paid* `hy4-preview`
+ *   (`x0.29`) under the same display name "Hy4 preview".
+ * - International: it carries `deepseek-v4.1-flash` (`x0.00`), `gpt-6-astra`,
+ *   `glm-5.3-flash` and `kimi-k2.8-preview`. The legacy
+ *   `/v2/enterprises/personal/models` view omits all four, so reading it alone
+ *   silently hides a free model.
+ *
+ * The legacy paths stay as fallbacks for an older deployment that has no
+ * `/v3/config`.
  */
 const CATALOG_PATH: Readonly<Record<WorkBuddyRegion, readonly string[]>> = {
-  global: ['/v2/enterprises/personal/models'],
+  global: ['/v3/config', '/v2/enterprises/personal/models'],
   cn: ['/v3/config', '/console/enterprises/personal/models'],
 }
 

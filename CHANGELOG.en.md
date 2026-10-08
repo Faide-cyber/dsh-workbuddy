@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.6] - 2026-10-09
+
+### Fixed
+
+- The international region lists `deepseek-v4.1-flash` (`x0.00`) again. After 1.0.5 dropped the local fallback list, the international region read `/v2/enterprises/personal/models`, which is a **truncated view**: it omits `deepseek-v4.1-flash` and reports `hy4-preview` as `x0.00` (its promotional price). Both regions now read the catalog the app itself reads, `GET https://www.workbuddy.ai/v3/config`, which also brings in `gpt-6-astra`, `glm-5.3-flash` and `kimi-k2.8-preview`. The old `/v2/enterprises/personal/models` path stays as a fallback, used only when `/v3/config` is unavailable.
+
 ## [1.0.5] - 2026-10-09
 
 ### Changed

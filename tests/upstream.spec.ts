@@ -68,6 +68,33 @@ describe('fetchModels', () => {
     expect(fallback.map(m => m.id)).toEqual(['hy4-preview'])
     expect(fallback.every(m => m.billing?.free === true)).toBe(false)
   })
+
+  it('reads the international app catalog, which the legacy view truncates', async () => {
+    const seen: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      seen.push(url)
+      // The narrow legacy view: no deepseek-v4.1-flash, hy4-preview shows x0.00.
+      if (url.includes('/v2/enterprises/personal/models')) {
+        return catalog([model('hy4-preview', 'x0.00'), model('hy3', 'x0.00')])
+      }
+      return catalog([
+        model('deepseek-v4.1-flash', 'x0.00'),
+        model('hy4-preview', 'x0.29'),
+        model('gpt-6-astra', 'x6.67'),
+      ])
+    })
+
+    const models = await new WorkBuddyUpstreamClient()
+      .fetchModels({ ...credential, domain: 'www.workbuddy.ai' })
+
+    // The app catalog is the first choice in both regions; the legacy path is
+    // only a fallback. Reading the legacy path alone hides a free model.
+    expect(seen).toEqual(['https://www.workbuddy.ai/v3/config'])
+    expect(models.map(m => m.id)).toEqual(['deepseek-v4.1-flash', 'hy4-preview', 'gpt-6-astra'])
+    expect(models.find(m => m.id === 'deepseek-v4.1-flash')?.billing?.free).toBe(true)
+    expect(models.find(m => m.id === 'hy4-preview')?.billing?.free).toBe(false)
+  })
 })
 
 describe('isFreeCredits', () => {

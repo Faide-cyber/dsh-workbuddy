@@ -75,7 +75,7 @@ agent-default-model:
 
 | 区域 | 接口 |
 |---|---|
-| 国际版 | `GET https://www.workbuddy.ai/v2/enterprises/personal/models` |
+| 国际版 | `GET https://www.workbuddy.ai/v3/config` |
 | 国内版 | `GET https://copilot.tencent.com/v3/config` |
 
 接口当前标的 `credits` 是多少，卡片和选择器就显示多少。插件**没有本地价格表**：上游新增模型或调价立即生效，不等插件发版，也不会再报昨天的价。
