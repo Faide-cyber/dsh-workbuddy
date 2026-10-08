@@ -22,7 +22,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { requestIsTrusted } from './loopback.ts'
-import { WORKBUDDY_CONTROL_PATH } from './status-paths.ts'
+import { WORKBUDDY_CONTROL_KEY_HEADER, WORKBUDDY_CONTROL_PATH } from './status-paths.ts'
 import type { WorkBuddyControlAction, WorkBuddyModelScope } from './status-paths.ts'
 
 /** Largest control body accepted; these payloads are a few dozen bytes. */
@@ -229,7 +229,7 @@ export function workBuddyAiControlHandler(
       json(res, 403, { error: 'request-not-trusted' })
       return
     }
-    if (!keyMatches(key, req.headers['x-workbuddy-ai-control-key'] as string | undefined)) {
+    if (!keyMatches(key, req.headers[WORKBUDDY_CONTROL_KEY_HEADER] as string | undefined)) {
       json(res, 403, { error: 'invalid-control-key' })
       return
     }

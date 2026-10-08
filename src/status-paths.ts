@@ -7,6 +7,9 @@
 /** Plugin-owned status endpoint consumed by its browser half. */
 export const WORKBUDDY_STATUS_PATH = '/plugins/dsh-workbuddy/status'
 
+/** Header carrying the per-process key on control requests. */
+export const WORKBUDDY_CONTROL_KEY_HEADER = 'x-workbuddy-control-key'
+
 /**
  * Plugin-owned control endpoint.
  *

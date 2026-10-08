@@ -10,6 +10,7 @@
 import { createServer, type Server } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createControlKey, workBuddyAiControlHandler, type WorkBuddyControlRouteOptions } from '../src/control-route.ts'
+import { WORKBUDDY_CONTROL_KEY_HEADER } from '../src/status-paths.ts'
 
 const KEY = createControlKey()
 const noop = (): void => {}
@@ -35,7 +36,7 @@ async function post(body: unknown, options: WorkBuddyControlRouteOptions): Promi
   if (address === null || typeof address === 'string') throw new Error('no port')
   const response = await fetch(`http://127.0.0.1:${address.port}/`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-workbuddy-ai-control-key': KEY },
+    headers: { 'content-type': 'application/json', [WORKBUDDY_CONTROL_KEY_HEADER]: KEY },
     body: JSON.stringify(body),
   })
   return { status: response.status, body: await response.json() as Record<string, unknown> }

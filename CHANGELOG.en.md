@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-10-09
+
+### Fixed
+
+- Unified the security header used by the settings card and host control route, fixing Connect and other card actions being rejected.
+
 ## [1.0.0] - 2026-10-09
 
 First standalone release under the `dsh-workbuddy` name with independent identifiers.

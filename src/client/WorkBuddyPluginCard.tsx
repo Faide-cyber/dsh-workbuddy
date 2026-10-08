@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
 import { Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { EXPIRY_SOON_DAYS, checkinExhausted, classifyCheckin, daysUntilExpiry, formatCountdown, formatExpiry } from '../display.ts'
-import { WORKBUDDY_CONTROL_PATH, WORKBUDDY_STATUS_PATH } from '../status-paths.ts'
+import { WORKBUDDY_CONTROL_KEY_HEADER, WORKBUDDY_CONTROL_PATH, WORKBUDDY_STATUS_PATH } from '../status-paths.ts'
 import type { WorkBuddyModelScope, WorkBuddyWebAccount, WorkBuddyWebModelBadge, WorkBuddyWebRegion, WorkBuddyWebStatus } from '../status-paths.ts'
 import type { WorkBuddySettingsKey } from './locales.ts'
 
@@ -296,7 +296,7 @@ async function postControl(key: string, body: unknown): Promise<ControlResult> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-WorkBuddy-Control-Key': key,
+        [WORKBUDDY_CONTROL_KEY_HEADER]: key,
       },
       body: JSON.stringify(body),
     })
