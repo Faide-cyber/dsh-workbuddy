@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.8] - 2026-10-09
+
+### Changed
+
+- The five README highlights were rewritten in the requester's own wording: **Sign-in** ("no desktop sign-in at all"; a desktop app credential is still importable read-only), **Accounts** (now naming credit warnings and account notes), **One-click check-in** ("auto check-in is available and off by default"), **Device isolation** (each account's credential, model catalog and credit balance stand apart; switching accounts never touches in-flight requests) and **Works out of the box** (enable it and use it, no extra configuration; DSH 0.2.0-rc.2 desktop is supported today).
+
 ## [1.0.7] - 2026-10-09
 
 ### Changed

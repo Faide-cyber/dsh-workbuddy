@@ -16,11 +16,11 @@
   <b>English</b> · <a href="./README.zh.md">中文</a>
 </p>
 
-- **Sign-in**: per-region browser OAuth — the desktop app is not needed; an existing desktop credential can still be imported read-only
-- **Accounts**: region-isolated multi-account list, explicit switching, credit display; the plugin keeps its own copy separate from the desktop auth files
-- **One-click check-in**: daily check-in, the cat's growth trip, and every growth-center task (签到 / 猫猫旅行) collected in one action — auto check-in is optional and off by default
-- **The two regions stay strangers**: each keeps its own credential, its own catalog and its own credit balance; an empty region stays empty rather than borrowing the other one's lineup, and switching accounts never touches in-flight requests
-- **Nothing is done to your desktop app**: its login state is only ever read, never written; the plugin stores its own per-region credential copies, and Disconnect deletes only those
+- **Sign-in**: per-region browser OAuth, no desktop sign-in at all; a credential from an installed desktop app can still be imported read-only
+- **Accounts**: region-isolated multi-account list, explicit switching, credit display and warnings; accounts can be given their own names; the plugin's copies are kept apart from the desktop auth files
+- **One-click check-in**: daily check-in, the cat's growth trip and every growth-center task (签到 / 猫猫旅行) collected in a single action; auto check-in is available and off by default
+- **Device isolation**: each account's credential, its model catalog and its credit balance stand apart; switching accounts never touches in-flight requests
+- **Works out of the box**: install it, enable it, and use it from DSH — no extra configuration; DSH 0.2.0-rc.2 desktop is supported today
 
 <p align="center">
   <img src="./docs/card-accounts.png" alt="DSH WorkBuddy settings card: accounts and credits" width="46%">
