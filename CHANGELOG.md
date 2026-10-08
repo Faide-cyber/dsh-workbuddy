@@ -2,9 +2,9 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.0.0] - 2026-02
+## [1.0.0] - 2026-10-09
 
-首个独立版本。插件基于 `dsh-workbuddyai-connect` 二次开发，重命名为 `dsh-workbuddy` 并改为独立标识。
+首个独立版本，以 `dsh-workbuddy` 名称发布并使用独立标识。
 
 ### 新增
 

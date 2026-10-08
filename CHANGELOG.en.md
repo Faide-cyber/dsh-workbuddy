@@ -2,9 +2,9 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] - 2026-02
+## [1.0.0] - 2026-10-09
 
-First standalone release. Derived from `dsh-workbuddyai-connect`, renamed to `dsh-workbuddy` with independent identifiers.
+First standalone release under the `dsh-workbuddy` name with independent identifiers.
 
 ### Added
 
