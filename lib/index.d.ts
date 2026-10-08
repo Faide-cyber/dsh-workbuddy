@@ -841,8 +841,8 @@ declare const WORKBUDDY_PROVIDER = "workbuddy-ai";
 /** Domestic route owned by this plugin; kept distinct from other WorkBuddy bundles. */
 declare const WORKBUDDY_CN_PROVIDER = "workbuddy-cn";
 /** Display name shown by the model picker and configuration surfaces. */
-declare const WORKBUDDY_DISPLAY_NAME = "WorkBuddy";
-declare const WORKBUDDY_CN_DISPLAY_NAME = "WorkBuddy 国内";
+declare const WORKBUDDY_DISPLAY_NAME = "WorkBuddy 国际版";
+declare const WORKBUDDY_CN_DISPLAY_NAME = "WorkBuddy 国内版";
 /** Constructor dependencies. */
 interface WorkBuddyAdapterOptions {
   shim: WorkBuddyShim;

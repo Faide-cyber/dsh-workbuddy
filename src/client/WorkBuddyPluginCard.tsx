@@ -390,7 +390,6 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
   const [error, setError] = useState<string | undefined>(undefined)
   const [waitingLogin, setWaitingLogin] = useState(false)
   const [loginRegion, setLoginRegion] = useState<'cn' | 'global'>('global')
-  const [authUrl, setAuthUrl] = useState<string | undefined>(undefined)
   const [regionTab, setRegionTab] = useState<'cn' | 'global'>('cn')
   const [removeAccountId, setRemoveAccountId] = useState<string | undefined>(undefined)
   const [noteAccountId, setNoteAccountId] = useState<string | undefined>(undefined)
@@ -437,13 +436,25 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
   }, [load])
 
   const regionRows = useMemo(() => status !== undefined && status.status !== 'error' ? status.regions ?? [] : [], [status])
-  // The tab wins while its own region is signed in; otherwise follow whichever
-  // region is, because the signed-out block has no region switcher — opening on
-  // an empty cn tab must not hide a signed-in global account.
-  const cardRegion: 'cn' | 'global' = fixedRegion
-    ?? (regionRows.find(region => region.region === regionTab)?.signedIn === true
-      ? regionTab
-      : regionRows.find(region => region.signedIn === true)?.region ?? regionTab)
+
+  // Open on a signed-in region once, so a card whose only account is the
+  // international one does not start on an empty domestic tab. Guarded by a ref
+  // so it never overrides a tab the user picked afterwards.
+  const seededRegion = useRef(false)
+  useEffect(() => {
+    if (seededRegion.current || fixedRegion !== undefined) return
+    const signedIn = regionRows.find(region => region.signedIn === true)
+    if (signedIn === undefined) return
+    seededRegion.current = true
+    setRegionTab(signedIn.region)
+  }, [fixedRegion, regionRows])
+
+  // The selected tab always wins. It used to fall back to whichever region was
+  // signed in whenever the *tab's* region was not, which made the other region
+  // unreachable: with cn signed in, clicking 国际版 flipped straight back to cn,
+  // so a second region could never be added. The one-time seed below keeps the
+  // original intent (open on the signed-in region) without overriding a click.
+  const cardRegion: 'cn' | 'global' = fixedRegion ?? regionTab
   const activeRegion: WorkBuddyWebRegion | undefined = regionRows.find(region => region.region === cardRegion)
   const signedInStatus = status?.status === 'signed-in' ? status : undefined
   // Everything region-shaped reads the *selected* region, never the document
@@ -533,13 +544,12 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
         return
       }
       setError(undefined)
-      setAuthUrl(result.authUrl)
       setWaitingLogin(true)
-      // The host already opened this URL (openAuthUrl in oauth.ts). Opening it a
-      // second time here raced the two tabs against one single-use login state:
-      // whichever loaded first consumed it, and the other showed the site's
-      // "login link incomplete" failure. One opener only; the `openLogin` link
-      // below stays as the fallback when the platform browser helper fails.
+      // The host opens this URL (openAuthUrl in oauth.ts) and it is the only
+      // opener: a second window.open here raced two tabs against one single-use
+      // login state, and whichever loaded first consumed it while the other
+      // showed the site's "login link incomplete" failure. The redundant
+      // "open login page" link is gone for the same reason — one button, one tab.
     } finally {
       if (mounted.current) setBusy(false)
     }
@@ -557,7 +567,6 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
         }
         if (result.pending === true) return
         setWaitingLogin(false)
-        setAuthUrl(undefined)
         await load()
       })()
     }, LOGIN_POLL_INTERVAL_MS)
@@ -742,13 +751,6 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                     </span>
                   </div>
                   <p style={bodyStyle}>{t('signedOutHint')}</p>
-                  {authUrl === undefined
-                    ? null
-                    : (
-                      <a href={authUrl} target="_blank" rel="noreferrer" style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}>
-                        {t('openLogin')}
-                      </a>
-                     )}
                 </div>
               )
               : null}

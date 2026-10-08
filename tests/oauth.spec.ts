@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { credentialFromPluginToken } from '../src/auth.ts'
 import { parseAction } from '../src/control-route.ts'
-import { LOGIN_TIMEOUT_MS, WorkBuddyOAuthLogin } from '../src/oauth.ts'
+import { browserOpenCommand, LOGIN_TIMEOUT_MS, WorkBuddyOAuthLogin } from '../src/oauth.ts'
 import { workBuddyAiWebStatus } from '../src/web-status.ts'
 import type { WorkBuddyCatalog } from '../src/catalog.ts'
 import type { WorkBuddyCredentialStore } from '../src/auth.ts'
@@ -11,6 +11,31 @@ function fakeJwt(payload: Record<string, unknown>): string {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   return `eyJhbGciOiJub25lIn0.${body}.x`
 }
+
+describe('browserOpenCommand', () => {
+  // Regression: `cmd /c start "" <url>` truncated the URL at the first `&`, so
+  // the browser opened `…/login/?platform=CLI` without `&state=…` and the site
+  // reported an incomplete login link. The Windows branch must never route the
+  // URL through a shell.
+  const url = 'https://www.workbuddy.ai/login/?platform=CLI&state=abc-123'
+
+  it('passes the whole URL, state included, on Windows', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    const { command, args } = browserOpenCommand(url)
+    expect(command).not.toBe('cmd')
+    expect(args).toContain(url)
+    expect(args.join(' ')).toContain('state=abc-123')
+    vi.restoreAllMocks()
+  })
+
+  it('uses the native opener on macOS and Linux', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    expect(browserOpenCommand(url)).toEqual({ command: 'open', args: [url] })
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    expect(browserOpenCommand(url)).toEqual({ command: 'xdg-open', args: [url] })
+    vi.restoreAllMocks()
+  })
+})
 
 describe('credentialFromPluginToken', () => {
   it('reads uid and enterpriseId from the access-token JWT', () => {

@@ -37,8 +37,8 @@ export const WORKBUDDY_PROVIDER = 'workbuddy-ai'
 export const WORKBUDDY_CN_PROVIDER = 'workbuddy-cn'
 
 /** Display name shown by the model picker and configuration surfaces. */
-export const WORKBUDDY_DISPLAY_NAME = 'WorkBuddy'
-export const WORKBUDDY_CN_DISPLAY_NAME = 'WorkBuddy 国内'
+export const WORKBUDDY_DISPLAY_NAME = 'WorkBuddy 国际版'
+export const WORKBUDDY_CN_DISPLAY_NAME = 'WorkBuddy 国内版'
 
 /** Provider idle ceiling while one stream read is outstanding. */
 export const WORKBUDDY_STREAM_IDLE_TIMEOUT_MS = 300_000

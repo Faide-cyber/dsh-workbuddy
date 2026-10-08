@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] - 2026-10-09
+
+### Fixed
+
+- Connect no longer opens a login URL with the `state` parameter stripped, which made the site report an incomplete login link. On Windows the URL is handed to `rundll32.exe url.dll,FileProtocolHandler` instead of going through `cmd /c start`, because `cmd.exe` treats the `&` in the URL as a command separator and truncates `&state=…`.
+- Clicking the other region no longer does nothing after one region is signed in. The card used to fall back to the signed-in region whenever the selected tab was not signed in, so a second region could never be added; the selected tab now always wins, with a one-time preselect of the signed-in region.
+- Removed the "Open login page" button, which duplicated Connect (same URL, same action, and two tabs raced for one single-use login state).
+
+### Changed
+
+- Provider display names are now **WorkBuddy 国际版** / **WorkBuddy 国内版**.
+- English is now the default README: `README.md` is English and the Chinese one moved to `README.zh.md`.
+
 ## [1.0.2] - 2026-10-09
 
 ### Fixed
@@ -29,7 +42,7 @@ First standalone release under the `dsh-workbuddy` name with independent identif
 - Free-model list driven by the product config pushed by the app, with a built-in fallback
 - Settings card: connect/disconnect, account management, `free / all models` scope, refresh intervals
 - CLI: `login` / `status` / `doctor` / `logout` (`status` and `doctor` accept `--json`)
-- Bilingual README ([中文](./README.md) / [English](./README.en.md)) and a CI workflow
+- Bilingual README ([English](./README.md) / [中文](./README.zh.md)) and a CI workflow
 
 ### Identifiers (fully isolated from `dsh-connect-workbuddy`)
 

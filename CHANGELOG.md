@@ -2,6 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.3] - 2026-10-09
+
+### 修复
+
+- 修复点击「连接」后浏览器打开的登录链接丢失 `state` 参数、站点报「登录链接不完整」的问题。Windows 下改用 `rundll32.exe url.dll,FileProtocolHandler`，不再经 `cmd /c start`——`cmd.exe` 会把 URL 里的 `&` 当成命令分隔符，把 `&state=…` 截断。
+- 修复已登录一个区域后另一个区域点不动的问题。此前所选区域未登录时会强制回落到「已登录的区域」，导致第二个区域永远无法添加；现在所选 tab 始终生效，仅在首次发现已登录区域时做一次性预选。
+- 移除与「连接」功能重复的「打开登录页」按钮（同一链接、同一动作，且两个标签页会争抢一次性 login state）。
+
+### 变更
+
+- Provider 显示名改为 **WorkBuddy 国际版** / **WorkBuddy 国内版**。
+- 默认 README 改为英文：`README.md` 为英文，中文移至 `README.zh.md`。
+
 ## [1.0.2] - 2026-10-09
 
 ### 修复
@@ -29,7 +42,7 @@
 - 免费模型名单以应用下发产品配置为准，缺失时回退到内置名单
 - 设置卡片：连接/断开、账号管理、`免费模型 / 全部模型` 范围切换、刷新间隔
 - 命令行：`login` / `status` / `doctor` / `logout`（`status`、`doctor` 支持 `--json`）
-- 双语 README（[中文](./README.md) / [English](./README.en.md)）与 CI 工作流
+- 双语 README（[English](./README.md) / [中文](./README.zh.md)）与 CI 工作流
 
 ### 标识（与 `dsh-connect-workbuddy` 完全隔离）
 

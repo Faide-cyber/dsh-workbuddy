@@ -30,17 +30,28 @@ export type WorkBuddyOAuthPoll =
   | { auth: WorkBuddyCredential }
 
 /**
+ * The platform command that opens `url` in the default browser.
+ *
+ * Windows deliberately does **not** use `cmd /c start`: `cmd` parses `&`, and
+ * every `authUrl` carries `&state=…`, so the shell cut the URL at the first `&`
+ * and opened `…/login/?platform=CLI` with no state. The site then answered
+ * "login link incomplete", and the tab that did carry a state was consumed by
+ * whichever of the two raced ahead. `rundll32` receives the URL as an ordinary
+ * argument, where `&` carries no meaning.
+ */
+export function browserOpenCommand(url: string): { command: string; args: string[] } {
+  if (process.platform === 'darwin') return { command: 'open', args: [url] }
+  if (process.platform === 'win32') return { command: 'rundll32.exe', args: ['url.dll,FileProtocolHandler', url] }
+  return { command: 'xdg-open', args: [url] }
+}
+
+/**
  * Open `url` with the platform browser helper. Failures are non-fatal: the
  * caller still returns the URL so the UI can offer a link.
  */
 export function openAuthUrl(url: string): boolean {
   try {
-    const command = process.platform === 'darwin'
-      ? 'open'
-      : process.platform === 'win32'
-        ? 'cmd'
-        : 'xdg-open'
-    const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url]
+    const { command, args } = browserOpenCommand(url)
     // Headless Linux has no `xdg-open`. spawn's ENOENT is an async `error`
     // event — try/catch cannot see it — and an unhandled one exits the
     // whole `dsh web` process after the card already received `authUrl`.
