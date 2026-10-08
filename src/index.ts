@@ -32,6 +32,7 @@ import { newestFirst, WorkBuddyProbeStore } from './probe-store.ts'
 import { acceptGrowthTasks, claimGrowthTask, fetchGrowthRewardToday, fetchGrowthStatus, fetchGrowthTasks, reportGrowthEvents, runGrowthTrip, WorkBuddyUpstreamClient, type WorkBuddyGrowthStatus, type WorkBuddyGrowthTask } from './upstream.ts'
 import { buildGrowthEvent, GROWTH_NIGHT_KINDS, growthTaskSpec, inGrowthNightWindow, isSkippedGrowthTask } from './growth-tasks.ts'
 import { loadProductConfig } from './product-config.ts'
+import { createProviderRows, type ProviderRows } from './provider-rows.ts'
 import { registerWorkBuddyStatusRoute } from './web-status.ts'
 import { createControlKey, registerWorkBuddyControlRoute } from './control-route.ts'
 import { WorkBuddyOAuthLogin } from './oauth.ts'
@@ -374,6 +375,27 @@ export function apply(ctx: Context, config: Config): void {
   // service is optional (a headless profile serves no browser).
   const controlKey = createControlKey()
   let refreshModels = () => {}
+  /**
+   * The provider rows this plugin offers, one per region. Undefined until the
+   * loopback endpoint is up; the row appears on sign-in and leaves on sign-out,
+   * because DSH has no way to list a provider "greyed out" — a registered route
+   * is an offered route.
+   */
+  let rows: ProviderRows | undefined
+  /** Add each region's provider row only while that region has credentials. */
+  const syncProviderRows = async (): Promise<void> => {
+    const live = rows
+    if (live === undefined) return
+    for (const region of ['global', 'cn'] as const) {
+      try {
+        live.setLive(region, (await storeFor(region).current()) !== undefined)
+      } catch (error: unknown) {
+        // A credential file that cannot be read is not a sign-in; leaving the row
+        // as it was beats flickering it off on a transient read error.
+        ctx.logger.warn(`dsh-workbuddy: could not read ${region} credentials`, error)
+      }
+    }
+  }
   /** Latest check-in read per account, so the card can show today's credit. */
   const checkinStates = new Map<string, { todayCheckedIn?: boolean; todayCredit?: number; streakDays?: number }>()
   /** Growth-plan state per account, plus today's payout when one landed. */
@@ -733,6 +755,9 @@ export function apply(ctx: Context, config: Config): void {
         const result = await login.poll()
         if ('pending' in result) return { pending: true as const }
         await target.importCredential(result.auth)
+        // The row lands before the catalog refresh, so the picker never shows a
+        // model list for a provider that is not registered yet.
+        void syncProviderRows()
         try {
           targetCatalog.setUpstream(await client.fetchModels(result.auth))
         } catch {
@@ -752,6 +777,9 @@ export function apply(ctx: Context, config: Config): void {
         const actual = region ?? 'global'
         oauthFor(actual).cancel()
         await storeFor(actual).logout()
+        // Signing out withdraws the row: the region has no credentials left, so
+        // offering its provider would only produce "no signed-in account" errors.
+        void syncProviderRows()
         refreshModels()
       },
       selectAccount: async (region, accountId) => {
@@ -768,6 +796,8 @@ export function apply(ctx: Context, config: Config): void {
       removeAccount: async (region, accountId) => {
         const target = storeFor(region)
         await target.removeAccount(accountId)
+        // Removing the last account empties the region, so the row goes with it.
+        void syncProviderRows()
         try {
           const credential = await target.resolve()
           catalogFor(region).setUpstream(await client.fetchModels(credential))
@@ -926,37 +956,26 @@ export function apply(ctx: Context, config: Config): void {
           ctx.emit('llm/adapters-updated')
         }
 
-        const releases: Array<() => void> = []
+        rows = createProviderRows(ctx.llm, new Map([
+          ['global', {
+            provider: WORKBUDDY_PROVIDER,
+            displayName: WORKBUDDY_DISPLAY_NAME,
+            settingsNs: WORKBUDDY_SETTINGS_NS,
+            adapter: globalAdapter.adapter,
+          }],
+          ['cn', {
+            provider: WORKBUDDY_CN_PROVIDER,
+            displayName: WORKBUDDY_CN_DISPLAY_NAME,
+            settingsNs: WORKBUDDY_SETTINGS_NS,
+            adapter: cnAdapter.adapter,
+          }],
+        ]))
         try {
-          releases.push(ctx.llm.registerAdapter([WORKBUDDY_PROVIDER], globalAdapter.adapter))
-          releases.push(ctx.llm.registerAdapter([WORKBUDDY_CN_PROVIDER], cnAdapter.adapter))
-          releases.push(ctx.llm.registerConfigurableProviders([
-            {
-              provider: WORKBUDDY_PROVIDER,
-              displayName: WORKBUDDY_DISPLAY_NAME,
-              settingsNs: WORKBUDDY_SETTINGS_NS,
-              settingsPath: [],
-              declared: false,
-            },
-            {
-              provider: WORKBUDDY_CN_PROVIDER,
-              displayName: WORKBUDDY_CN_DISPLAY_NAME,
-              settingsNs: WORKBUDDY_SETTINGS_NS,
-              settingsPath: [],
-              declared: false,
-            },
-          ]))
-        } catch (error: unknown) {
-          for (const release of releases.reverse()) release()
-          throw error
-        }
-        try {
-          ctx.effect(() => () => {
-            for (const release of releases.reverse()) release()
-          })
+          ctx.effect(() => () => rows?.releaseAll())
         } catch {
-          for (const release of releases.reverse()) release()
+          rows.releaseAll()
         }
+        void syncProviderRows()
 
         // The host bundle is live: write a heartbeat so the status CLI can report
         // host health without a browser. Cleared on disposal; a stale heartbeat

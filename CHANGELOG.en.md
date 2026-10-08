@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.4] - 2026-10-09
+
+### Fixed
+
+- WorkBuddy providers no longer appear on the Models settings page while signed out. The provider and its directory entry used to be registered unconditionally at startup, so the page listed a route with no credentials that could not be used; registration now follows each region's credentials — the row appears after signing in to that region and disappears after disconnecting or removing its last account. Both halves (adapter and directory entry) always move together, so a row is never listed but unusable.
+
+### Changed
+
+- The signed-out hint no longer says the desktop app is optional; it now just says to click Connect and sign in through the WorkBuddy website.
+- Both READMEs now use a centered title plus badges (license, DSH version, provider count, free-by-default, zero runtime dependencies), and drop the "standalone/isolated from other WorkBuddy plugins" sentence, the `## Relationship to other WorkBuddy plugins` section, `## Known limitations`, and the architecture-credit line.
+
 ## [1.0.3] - 2026-10-09
 
 ### Fixed

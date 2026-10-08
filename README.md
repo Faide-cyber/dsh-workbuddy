@@ -1,14 +1,26 @@
-# DSH WorkBuddy
+<h1 align="center">DSH WorkBuddy</h1>
 
-Bring **WorkBuddy (domestic and international)** models into DeepSeek Harness. This plugin is standalone: its providers, loopback shim, and credential copies are isolated from any other WorkBuddy plugin.
+<p align="center">
+  <em>Bring WorkBuddy (domestic and international) models into DeepSeek Harness — browser OAuth, free models by default.</em>
+</p>
 
-English | [中文](./README.zh.md)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-65a30d?style=flat" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/dsh-0.2.0--rc.2-4f46e5?style=flat" alt="DSH 0.2.0-rc.2">
+  <img src="https://img.shields.io/badge/providers-two-0ea5e9?style=flat" alt="two providers">
+  <img src="https://img.shields.io/badge/default-free_models-brightgreen?style=flat" alt="free models by default">
+  <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen?style=flat" alt="zero runtime dependencies">
+</p>
+
+<p align="center">
+  <b>English</b> · <a href="./README.zh.md">中文</a>
+</p>
 
 - **Sign-in**: per-region browser OAuth, or a read-only import from the desktop app
 - **Accounts**: region-isolated multi-account list, explicit switching, credit display; the plugin keeps its own copy separate from the desktop auth files
 - **Domestic**: optional auto check-in (off by default, only ticked accounts)
 - **Default models**: international lists free models from the product config; domestic lists free models from that region's live catalog
-- **Providers**: `workbuddy-ai` (international) and `workbuddy-cn` (domestic) — coexist with other WorkBuddy plugins
+- **Providers**: `workbuddy-ai` (international) and `workbuddy-cn` (domestic) — a provider only shows up in the model list once you have signed in to that region
 
 ## Quick start
 
@@ -75,22 +87,6 @@ The catalog does not return `deepseek-v4.1-flash` or `hy4-preview-f`; the plugin
 
 The settings card can switch the scope to **All models**. Paid models show their multiplier after the name, and selecting one really does burn credits.
 
-## Relationship to other WorkBuddy plugins
-
-| | `dsh-connect-workbuddy` | `dsh-workbuddy` |
-|---|---|---|
-| Providers | `workbuddy` / `workbuddy-global` | `workbuddy-cn` / `workbuddy-ai` |
-| Credentials | `.workbuddy-auth.cn.json` / `.global.json` | `.workbuddy-cn-auth.json` / `.workbuddy-ai-auth.json` |
-| Catalog endpoints | domestic `/console/...`, international regional endpoints | domestic `/console/...`, international `/v2/enterprises/...` |
-| Account features | two-region account pool | two-region account list with explicit switching |
-| Check-in | supported for domestic | supported for domestic, off by default |
-
-Both can be installed at the same time. Providers, loopback shims, and credential copies are isolated; if they point at the same upstream account, credits, rate limits, and concurrency are still shared server-side.
-
-```sh
-dsh plugin --profile web remove dsh-connect-workbuddy
-```
-
 ## Configuration
 
 Settings → Plugins → **DSH WorkBuddy**:
@@ -151,18 +147,9 @@ dsh plugin --profile web exec dsh-workbuddy logout
 dsh plugin --profile web exec dsh-workbuddy doctor
 ```
 
-## Known limitations
-
-- Verified under DSH Web on macOS. On headless Linux, "Connect" no longer crashes the process when `xdg-open` is missing. Credential paths are probed on Windows / WSL but not tested there.
-- Depends on WorkBuddy client endpoints (not an official open API); upstream changes may require plugin updates.
-- The domestic and international endpoints depend on the WorkBuddy client service; upstream changes may require updates for the affected region.
-- Auto check-in is domestic-only and off by default; real model probing never runs on a background timer — opening the card does one low-cost connectivity check.
-
 ## Disclaimer
 
 For personal learning and research only, driving your own WorkBuddy account on your own machine. Follow the WorkBuddy terms of service. This project is not affiliated with Tencent, WorkBuddy, or DeepSeek.
-
-Architecture inspired by [corrinehu/dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect) (MIT).
 
 ## License
 

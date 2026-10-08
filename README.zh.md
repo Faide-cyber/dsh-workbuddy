@@ -1,14 +1,26 @@
-# DSH WorkBuddy
+<h1 align="center">DSH WorkBuddy</h1>
 
-把 **WorkBuddy 国内版与国际版** 接到 DeepSeek Harness。本插件独立于其它 WorkBuddy 插件，Provider、loopback 与凭据副本全部隔离。
+<p align="center">
+  <em>把 WorkBuddy 国内版与国际版模型接进 DeepSeek Harness —— 浏览器 OAuth，默认只列免费模型。</em>
+</p>
 
-[English](./README.md) | 中文
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-65a30d?style=flat" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/dsh-0.2.0--rc.2-4f46e5?style=flat" alt="DSH 0.2.0-rc.2">
+  <img src="https://img.shields.io/badge/providers-two-0ea5e9?style=flat" alt="two providers">
+  <img src="https://img.shields.io/badge/default-free_models-brightgreen?style=flat" alt="free models by default">
+  <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen?style=flat" alt="zero runtime dependencies">
+</p>
+
+<p align="center">
+  <a href="./README.md">English</a> · <b>中文</b>
+</p>
 
 - **登录**：按区域使用浏览器 OAuth，或只读导入桌面 App 的凭据
 - **账号**：区域隔离的多账号列表、显式切换、余额显示；插件副本与桌面 auth 文件分离
 - **国内版**：可选自动签到（默认关闭，仅勾选账号）
 - **默认模型**：国际版按产品配置列出免费模型；国内版按该区域实时目录列出免费模型
-- **Provider**：`workbuddy-ai`（国际）与 `workbuddy-cn`（国内），和其他 WorkBuddy 插件可以并存
+- **Provider**：`workbuddy-ai`（国际）与 `workbuddy-cn`（国内）—— 只有登录过该区域，模型列表里才会出现对应 Provider
 
 ## 快速开始
 
@@ -75,22 +87,6 @@ agent-default-model:
 
 设置卡片可以把范围改成 **全部模型**。付费模型名称后会显示倍率，选用会真实扣积分。
 
-## 和其他 WorkBuddy 插件的关系
-
-| | `dsh-connect-workbuddy` | `dsh-workbuddy` |
-|---|---|---|
-| Provider | `workbuddy` / `workbuddy-global` | `workbuddy-cn` / `workbuddy-ai` |
-| 凭据 | `.workbuddy-auth.cn.json` / `.global.json` | `.workbuddy-cn-auth.json` / `.workbuddy-ai-auth.json` |
-| 目录接口 | 国内 `/console/...`、国际对应区域接口 | 国内 `/console/...`、国际 `/v2/enterprises/...` |
-| 账号功能 | 双区域账号池 | 双区域账号列表与显式切换 |
-| 签到 | 国内支持 | 国内支持，默认关闭 |
-
-两者可以同时安装。Provider、loopback、凭据副本都隔离；若使用同一个上游账号，积分、限流和并发仍由服务端共享。
-
-```sh
-dsh plugin --profile web remove dsh-connect-workbuddy
-```
-
 ## 配置
 
 设置 → 插件 → **DSH WorkBuddy**：
@@ -151,18 +147,9 @@ dsh plugin --profile web exec dsh-workbuddy logout
 dsh plugin --profile web exec dsh-workbuddy doctor
 ```
 
-## 已知限制
-
-- 在 macOS 的 DSH Web 下验证。无头 Linux 上「连接」不会再因缺少 `xdg-open` 把进程打崩。Windows / WSL 探测了凭据路径，未实测。
-- 依赖 WorkBuddy 客户端接口（非官方开放 API），上游更新后插件可能要跟着改。
-- 国内/国际接口依赖 WorkBuddy 客户端服务；上游更新后对应区域功能可能要跟着改。
-- 自动签到只对国内区域提供，且默认关闭；真实模型探测不会后台定时执行，打开卡片时仅做一次低成本连通性检查。
-
 ## 免责声明
 
 仅供个人学习和研究，只驱动你自己的 WorkBuddy 账号在本机调用。请遵守 WorkBuddy 服务条款。本项目与腾讯、WorkBuddy、DeepSeek 均无关联。
-
-架构参考 [corrinehu/dsh-workbuddy-connect](https://github.com/corrinehu/dsh-workbuddy-connect)（MIT）。
 
 ## 许可证
 
