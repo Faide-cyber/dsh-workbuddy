@@ -1,14 +1,14 @@
 <h1 align="center">DSH WorkBuddy</h1>
 
 <p align="center">
-  <em>Bring WorkBuddy (domestic and international) models into DeepSeek Harness — browser OAuth, free models by default.</em>
+  <em>Bring WorkBuddy (domestic and international) models into DeepSeek Harness — no WorkBuddy desktop app required.</em>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-65a30d?style=flat" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/dsh-0.2.0--rc.2-4f46e5?style=flat" alt="DSH 0.2.0-rc.2">
   <img src="https://img.shields.io/badge/providers-two-0ea5e9?style=flat" alt="two providers">
-  <img src="https://img.shields.io/badge/default-free_models-brightgreen?style=flat" alt="free models by default">
+  <img src="https://img.shields.io/badge/prices-live_catalog-brightgreen?style=flat" alt="prices from the live catalog">
   <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen?style=flat" alt="zero runtime dependencies">
 </p>
 
@@ -16,10 +16,10 @@
   <b>English</b> · <a href="./README.zh.md">中文</a>
 </p>
 
-- **Sign-in**: per-region browser OAuth, or a read-only import from the desktop app
+- **Sign-in**: per-region browser OAuth — the desktop app is not needed; an existing desktop credential can still be imported read-only
 - **Accounts**: region-isolated multi-account list, explicit switching, credit display; the plugin keeps its own copy separate from the desktop auth files
-- **Domestic**: optional auto check-in (off by default, only ticked accounts)
-- **Default models**: international lists free models from the product config; domestic lists free models from that region's live catalog
+- **Domestic one-click**: daily check-in, the cat's growth trip, and every growth-center task (签到 / 猫猫旅行) collected in one action — auto check-in is optional and off by default
+- **Live pricing**: every model is listed and priced by its own region's live catalog, so new models and price changes show up without a plugin release
 - **Providers**: `workbuddy-ai` (international) and `workbuddy-cn` (domestic) — a provider only shows up in the model list once you have signed in to that region
 
 ## Quick start
@@ -33,7 +33,7 @@ dsh web
 ```
 
 3. Open **Settings → Plugins → DSH WorkBuddy**, click **Connect**, and sign in on the WorkBuddy page that opens.
-4. Pick **WorkBuddy / Deepseek-V4.1-Flash** in the model selector.
+4. Pick a **WorkBuddy** model in the model selector — with the default **free models only** scope, the list is exactly what that region's catalog prices `x0.00` right now.
 
 You can also sign in from a terminal:
 
@@ -48,9 +48,11 @@ The default model can be set in `~/.dsh/settings.yaml`:
 ```yaml
 agent-default-model:
   provider: workbuddy-ai
-  model: deepseek-v4.1-flash
-  reasoningEffort: max
+  model: hy3
+  reasoningEffort: high
 ```
+
+Use an id the region actually lists: the model list is whatever that region's live catalog returns, so a pinned default can become stale. `hy3` is free in both regions at the time of writing.
 
 ## How sign-in works
 
@@ -67,23 +69,20 @@ The settings card lists every imported account. Switching only affects subsequen
 
 **Disconnect** / `logout` only deletes that region's own plugin credentials; the desktop app is untouched.
 
-## Free models
+## Models and prices
 
-The international catalog endpoint (`/v2/enterprises/personal/models`) omits some models, and its `credits` values are not always accurate. The plugin treats the product config pushed by the app as authoritative:
+Each region is listed and priced **from its own live catalog** — the same endpoint the official CLI reads:
 
-`~/.workbuddy-ai/cache/acc-product-config-v3.json`
+| Region | Endpoint |
+|---|---|
+| International | `GET https://www.workbuddy.ai/v2/enterprises/personal/models` |
+| Domestic | `GET https://copilot.tencent.com/v3/config` |
 
-When that cache is unavailable, the plugin falls back to its built-in free list. Currently free (`x0.00`) models:
+Whatever the endpoint currently quotes in `credits` is exactly what the card and the picker show. There is no local price table: a model added or repriced upstream appears without a plugin release, and nothing is quoted from a stale list.
 
-| Model | Context | Image | Reasoning effort |
-|---|---|---|---|
-| `deepseek-v4.1-flash` | 1M | yes | defaults to high; accepts low / medium / high / xhigh / max |
-| `hy4-preview-f` | 1M | yes | declares high |
-| `hy3` | 192k | yes | declares low / high |
+A region with no answer yet shows an empty list on purpose — a region never borrows the other region's lineup.
 
-The catalog does not return `deepseek-v4.1-flash` or `hy4-preview-f`; the plugin adds them from the product config.
-
-`hy4-preview` (without `-f`) may show `x0.00` in the catalog while the product config says `x0.29`. The plugin takes the stricter value so it is never mistaken for free.
+The catalog's `credits` values are the **displayed** price, after any active promotion. A limited-time free tier therefore reads `x0.00` for as long as it runs, and returns to the paid rate afterwards. `hy4-preview` is the common example: it reads `x0.00` while its "Free now" promotion is active and `x0.29` outside it. The plugin mirrors whatever the region publishes rather than second-guessing it.
 
 The settings card can switch the scope to **All models**. Paid models show their multiplier after the name, and selecting one really does burn credits.
 
@@ -119,7 +118,6 @@ Environment variables:
 |---|---|
 | `DSH_WORKBUDDY_AUTH_FILE` | Override the international desktop credential path (OAuth credentials still go to the plugin's own file) |
 | `DSH_WORKBUDDY_CN_AUTH_FILE` | Override the domestic desktop credential path |
-| `DSH_WORKBUDDY_PRODUCT_CONFIG` | Override the product config JSON path |
 
 ## CLI
 
@@ -139,9 +137,10 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | No card in settings / no WorkBuddy in the model list | Restart `dsh web`; refreshing the browser is not enough |
 | `dsh web` exits after clicking Connect | On headless Linux without `xdg-open`, update to a build with spawn `error` handling; use the sign-in link on the card |
 | 403 `request-not-trusted` when opening the card over a LAN IP | Add that IP/hostname to `allowedHosts`; do not put it in the loopback list |
-| Signed in but no free models | Check whether `doctor` can read the product config; without the cache it uses the built-in three-model list |
+| Signed in but no models | The region's catalog request failed or returned nothing — check connectivity and whether the token is still valid; the list stays empty rather than borrowing the other region's models |
 | `doctor` says signed-out | Run `login` first, or confirm the international desktop app is signed in |
 | Want paid models | Switch the scope to "All models" on the settings card — credits will be burned |
+| A model shows `x0.00` but you expected a price | It is inside a limited-time free promotion; the paid rate returns when the promotion ends |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

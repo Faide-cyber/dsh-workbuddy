@@ -153,9 +153,7 @@ async function buildRegionStatus(
     ...options.catalog.all().length === 0 ? {} : { models: modelBadges(options.catalog) },
     scope: options.catalog.currentScope(),
     freeIds: options.catalog.freeIds(),
-    priceSource: options.catalog.usesUpstreamPricing() ? 'upstream' : options.catalog.product().source,
-    ...options.catalog.product().path === undefined ? {} : { priceSourcePath: options.catalog.product().path },
-    ...options.catalog.product().endpoint === undefined ? {} : { endpoint: options.catalog.product().endpoint },
+    priceSource: 'upstream',
     ...options.probe === undefined ? {} : { probe: options.probe() },
     checkin: {
       supported: options.region === 'cn',
@@ -191,29 +189,12 @@ export async function workBuddyAiWebStatus(
   const selectedAuth = authStatus.state === 'signed-in' ? authStatus : undefined
 
   const catalog = deps.catalog
-  const product = catalog.product()
   const freeIds = catalog.freeIds()
-  const free = new Set(freeIds)
-  const selectable = new Set(catalog.current().map(model => model.id))
-
-  // The card receives *every* model the product configuration knows about, not
-  // just the free ones: context capacity and price are exactly the facts a user
-  // wants before deciding whether to lift the free-only filter, and the models
-  // where that matters most are the paid ones.
-  const modelsField: readonly WorkBuddyWebModelBadge[] = product.models
-    .map(row => {
-      const rate = normalizeCredits(row.credits)
-      const isFree = free.has(row.id)
-      return {
-        id: row.id,
-        name: row.name,
-        ...isFree ? { free: true as const } : {},
-        ...rate === undefined ? {} : { credits: rate },
-        ...row.contextWindow > 0 ? { contextWindow: row.contextWindow } : {},
-        selectable: selectable.has(row.id),
-        enabled: !catalog.isDisabled(row.id),
-      }
-    })
+  // The card receives every model the region's live catalog returned, not just
+  // the free ones: context capacity and price are exactly the facts a user wants
+  // before deciding whether to lift the free-only filter, and the models where
+  // that matters most are the paid ones.
+  const modelsField: readonly WorkBuddyWebModelBadge[] = modelBadges(catalog)
 
   const status: WorkBuddyWebStatus = {
     status: 'signed-in',
@@ -224,9 +205,7 @@ export async function workBuddyAiWebStatus(
     ...modelsField.length === 0 ? {} : { models: modelsField },
     scope: catalog.currentScope(),
     freeIds,
-    priceSource: product.source,
-    ...product.path === undefined ? {} : { priceSourcePath: product.path },
-    ...product.endpoint === undefined ? {} : { endpoint: product.endpoint },
+    priceSource: 'upstream',
     ...regionStatuses.length === 0 ? {} : { regions: regionStatuses },
     refreshPolicy: policy,
     autoCheckin: deps.autoCheckin?.() ?? false,

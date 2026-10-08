@@ -1,14 +1,14 @@
 <h1 align="center">DSH WorkBuddy</h1>
 
 <p align="center">
-  <em>把 WorkBuddy 国内版与国际版模型接进 DeepSeek Harness —— 浏览器 OAuth，默认只列免费模型。</em>
+  <em>把 WorkBuddy 国内版与国际版模型接进 DeepSeek Harness —— 无需下载 WorkBuddy 桌面端。</em>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-65a30d?style=flat" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/dsh-0.2.0--rc.2-4f46e5?style=flat" alt="DSH 0.2.0-rc.2">
   <img src="https://img.shields.io/badge/providers-two-0ea5e9?style=flat" alt="two providers">
-  <img src="https://img.shields.io/badge/default-free_models-brightgreen?style=flat" alt="free models by default">
+  <img src="https://img.shields.io/badge/prices-live_catalog-brightgreen?style=flat" alt="prices from the live catalog">
   <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen?style=flat" alt="zero runtime dependencies">
 </p>
 
@@ -16,10 +16,10 @@
   <a href="./README.md">English</a> · <b>中文</b>
 </p>
 
-- **登录**：按区域使用浏览器 OAuth，或只读导入桌面 App 的凭据
+- **登录**：按区域使用浏览器 OAuth，无需桌面 App；已装桌面 App 的凭据也可只读导入
 - **账号**：区域隔离的多账号列表、显式切换、余额显示；插件副本与桌面 auth 文件分离
-- **国内版**：可选自动签到（默认关闭，仅勾选账号）
-- **默认模型**：国际版按产品配置列出免费模型；国内版按该区域实时目录列出免费模型
+- **国内一键**：每日签到、猫猫旅行、成长中心全部任务（签到 / 猫猫旅行）一键收取；自动签到可选，默认关闭
+- **实时价格**：模型与价格全部来自各区域自己的实时目录，产品新增模型或调价无需等插件发版
 - **Provider**：`workbuddy-ai`（国际）与 `workbuddy-cn`（国内）—— 只有登录过该区域，模型列表里才会出现对应 Provider
 
 ## 快速开始
@@ -33,7 +33,7 @@ dsh web
 ```
 
 3. 打开 **设置 → 插件 → DSH WorkBuddy**，点 **连接**，在弹出的 WorkBuddy 网站里登录。
-4. 模型选择器里选 **WorkBuddy / Deepseek-V4.1-Flash**。
+4. 模型选择器里选一个 **WorkBuddy** 模型 —— 默认「仅免费模型」范围下，列表就是该区域目录当前标的 `x0.00` 的那些。
 
 也可以在终端登录：
 
@@ -48,9 +48,11 @@ dsh plugin --profile web exec dsh-workbuddy login
 ```yaml
 agent-default-model:
   provider: workbuddy-ai
-  model: deepseek-v4.1-flash
-  reasoningEffort: max
+  model: hy3
+  reasoningEffort: high
 ```
+
+请填该区域当前确实列出的 id：模型列表就是该区域实时目录返回的内容，写死的默认模型可能过时。`hy3` 在撰写时两区都免费。
 
 ## 登录怎么工作
 
@@ -67,23 +69,20 @@ agent-default-model:
 
 **断开** / `logout` 只删对应区域插件自己的凭据，不影响桌面 App。
 
-## 免费模型
+## 模型与价格
 
-国际版目录接口（`/v2/enterprises/personal/models`）会漏掉部分模型，而且目录里的 `credits` 不一定准。插件以应用下发的产品配置为准：
+每个区域的模型与价格都**来自它自己的实时目录**——官方 CLI 读的就是同一个接口：
 
-`~/.workbuddy-ai/cache/acc-product-config-v3.json`
+| 区域 | 接口 |
+|---|---|
+| 国际版 | `GET https://www.workbuddy.ai/v2/enterprises/personal/models` |
+| 国内版 | `GET https://copilot.tencent.com/v3/config` |
 
-读不到这份缓存时，用插件内置的免费名单。当前免费（`x0.00`）模型：
+接口当前标的 `credits` 是多少，卡片和选择器就显示多少。插件**没有本地价格表**：上游新增模型或调价立即生效，不等插件发版，也不会再报昨天的价。
 
-| 模型 | 上下文 | 图像 | 推理档 |
-|---|---|---|---|
-| `deepseek-v4.1-flash` | 1M | 是 | 默认 high；实测接受 low / medium / high / xhigh / max |
-| `hy4-preview-f` | 1M | 是 | 声明 high |
-| `hy3` | 192k | 是 | 声明 low / high |
+还没拿到该区域目录时列表就是空的，这是刻意的——一个区域绝不借用另一个区域的模型清单。
 
-目录不返回 `deepseek-v4.1-flash` 和 `hy4-preview-f`，插件会按产品配置补进列表。
-
-`hy4-preview`（不带 `-f`）在目录里可能显示 `x0.00`，产品配置里是 `x0.29`。按产品配置从严，避免误当免费而扣费。
+目录里的 `credits` 是**叠加活动折扣后的展示价**。限时免费活动期间它就是 `x0.00`，活动结束后恢复原价。`hy4-preview` 就是典型：活动期内显示 `x0.00`，活动外是 `x0.29`。插件只如实照搬各区域当前公布的价格，不再自行从严或从宽。
 
 设置卡片可以把范围改成 **全部模型**。付费模型名称后会显示倍率，选用会真实扣积分。
 
@@ -119,7 +118,6 @@ agent-default-model:
 |---|---|
 | `DSH_WORKBUDDY_AUTH_FILE` | 覆盖国际桌面凭据路径（OAuth 凭据仍写插件自己的文件） |
 | `DSH_WORKBUDDY_CN_AUTH_FILE` | 覆盖国内桌面凭据路径 |
-| `DSH_WORKBUDDY_PRODUCT_CONFIG` | 覆盖产品配置 JSON 路径 |
 
 ## 命令行
 
@@ -139,9 +137,10 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | 设置里没有这张卡片 / 模型列表没有 WorkBuddy | 重启 `dsh web`，不要只刷新浏览器 |
 | 点连接后 `dsh web` 进程退出 | 无头 Linux 没有 `xdg-open` 时请更新到含 spawn `error` 处理的版本；用卡片上的登录链接 |
 | 局域网 IP 打开卡片 403 `request-not-trusted` | 在 `allowedHosts` 里写该 IP/主机名，不要把它加进回环名单 |
-| 登录成功但没有免费模型 | 看 `doctor` 是否读到产品配置；没有缓存时用内置三模型名单 |
+| 登录成功但没有模型 | 该区域目录请求失败或返回为空——检查网络与 token 是否仍有效；此时列表保持为空，不会借用另一区域的模型 |
 | `doctor` 显示 signed-out | 先 `login`，或确认国际版桌面 App 已登录 |
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
+| 模型显示 `x0.00` 但你以为要收费 | 它正处于限时免费活动期，活动结束后恢复原价 |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

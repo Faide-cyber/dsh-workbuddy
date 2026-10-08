@@ -522,131 +522,29 @@ declare function runGrowthTrip(credential: WorkBuddyCredential, locationId?: num
   reason?: string;
 }>;
 //#endregion
-//#region src/product-config.d.ts
-/** Absolute path of the cached product configuration. */
-declare function workBuddyProductConfigPath(): string;
-/** One model row from the product configuration, narrowed to what is used. */
-interface WorkBuddyProductModel {
-  id: string;
-  name: string;
-  /** Credits multiplier, e.g. `"x0.00"`. Absent when the config states none. */
-  credits?: string;
-  contextWindow: number;
-  maxTokens: number;
-  supportsImages: boolean;
-  supportsReasoning: boolean;
-  onlyReasoning: boolean;
-  supportedEfforts?: readonly WorkBuddyEffort[];
-  defaultEffort?: WorkBuddyEffort;
-  canDisableThinking: boolean;
-}
-/** The parsed slice of the product configuration this plugin consumes. */
-interface WorkBuddyProductConfig {
-  /** Where the data came from, for diagnostics and the settings card. */
-  source: 'cache' | 'builtin';
-  /** Path consulted for `cache`; absent for `builtin`. */
-  path?: string;
-  /** Application the config describes, e.g. `workbuddy-ai`. */
-  applicationName?: string;
-  /** Endpoint the config points at, e.g. `https://www.workbuddy.ai`. */
-  endpoint?: string;
-  /** Whether the config describes the overseas build. */
-  isOversea?: boolean;
-  /** Every model row, in configuration order. */
-  models: readonly WorkBuddyProductModel[];
-}
-/**
- * Every model the international deployment prices `x0.00`, with the metadata
- * copied verbatim from the product configuration.
- *
- * This is the fallback the plugin uses when the app's cache cannot be read, and
- * it is deliberately a *whitelist of the free* rather than a blacklist of the
- * paid: a model absent from both this table and the cache is treated as paid, so
- * the failure mode is "a free model is missing" rather than "a paid model is
- * billed silently".
- *
- * `hy4-preview` (without the `-f`) is deliberately absent even though the
- * catalog endpoint reports it as `x0.00`: the product configuration prices it
- * `x0.29`, so it is paid, and it shares its display name with `hy4-preview-f` —
- * including both would show two identically-named rows, one of them billable.
- */
-declare const BUILTIN_FREE_MODELS: readonly WorkBuddyUpstreamModel[];
-/** Ids of the models the product configuration prices free. */
-declare const FALLBACK_FREE_MODEL_IDS: readonly string[];
-/**
- * Last-known international `credits` multipliers, used when the app cache is
- * absent. Catalog `x0.00` is not trusted (`hy4-preview` is x0.29 here).
- */
-declare const BUILTIN_CREDITS: Readonly<Record<string, string>>;
-/**
- * The subset the catalog endpoint does not return, so they must be injected.
- *
- * `hy3` is absent from this list because the endpoint does list it; the other
- * two are missing from the live catalog entirely.
- */
-declare const FALLBACK_EXTRA_MODELS: readonly WorkBuddyUpstreamModel[];
-/** Parse a product-configuration document; undefined when it is not usable. */
-declare function parseProductConfig(text: string): WorkBuddyProductConfig | undefined;
-/**
- * Load the product configuration, falling back to the built-in table.
- *
- * A missing or malformed cache is never an error: the plugin must still offer
- * its free models on a machine where the app has not run yet.
- */
-declare function loadProductConfig(path?: string): WorkBuddyProductConfig;
-/**
- * The free model ids a configuration declares.
- *
- * Only an explicit `x0.00` counts. When the cache is absent the built-in
- * whitelist applies, so the answer is never "every model" — a mis-read must not
- * be able to turn the free-only filter into a no-op.
- */
-declare function freeModelIds(config: WorkBuddyProductConfig): readonly string[];
-//#endregion
 //#region src/catalog.d.ts
 /** One model entry the adapter exposes. */
 type WorkBuddyModelInfo = WorkBuddyUpstreamModel;
 /** How the catalog decides which models the picker may show. */
 type WorkBuddyModelScope = 'free' | 'all';
-/**
- * Static rows served before the first upstream answer arrives, and whenever the
- * upstream is unreachable.
- *
- * These are the two free models the international deployment does not list in
- * its catalog endpoint, plus `hy3` which it does. Serving a usable list from the
- * first moment means an offline upstream never leaves the provider empty.
- */
-declare const FALLBACK_WORKBUDDY_MODELS: readonly WorkBuddyModelInfo[];
 /** Constructor dependencies for {@link WorkBuddyCatalog}. */
 interface WorkBuddyCatalogOptions {
-  /** Product configuration supplying prices and the omitted-model rows. */
-  productConfig: WorkBuddyProductConfig;
   /** Which models the picker may show; see {@link WorkBuddyModelScope}. */
   scope?: WorkBuddyModelScope;
-  /** Keep the legacy static fallback; false prevents a region leaking another region's list. */
-  fallback?: boolean;
-  /** Use each region's upstream billing instead of the global product cache. */
-  priceAuthority?: 'product' | 'upstream';
 }
 /**
- * Merge the upstream catalog with the product configuration under one billing
- * policy.
+ * Apply the billing policy to the region's upstream rows.
  *
- * Order of operations, each step deliberate:
- *
- * 1. Start from the upstream rows (or the fallback when there are none yet).
- * 2. Add product-config rows for free models the upstream omitted — this is what
- *    brings `deepseek-v4.1-flash` and `hy4-preview-f` into the picker.
- * 3. Overwrite each row's billing with the product configuration's verdict when
- *    it has one, so the catalog's wrong `x0.00` on a paid model cannot survive.
- * 4. Drop everything outside the policy's allow-list, *last*, so no later step
- *    can reintroduce a model the policy excluded.
+ * The filter runs last and only over the rows the region actually returned: an
+ * empty upstream yields an empty list, deliberately. A region with no answer
+ * yet must not borrow another region's models, or a sign-in to one deployment
+ * would advertise the other's lineup.
  *
  * @param upstream - rows from the live catalog; empty before the first fetch.
- * @param options - product configuration and the active billing policy.
- * @returns the effective model list, upstream order first.
+ * @param options - the active billing policy.
+ * @returns the effective model list, upstream order preserved.
  */
-declare function composeCatalog(upstream: readonly WorkBuddyModelInfo[], options: WorkBuddyCatalogOptions): readonly WorkBuddyModelInfo[];
+declare function composeCatalog(upstream: readonly WorkBuddyModelInfo[], options?: WorkBuddyCatalogOptions): readonly WorkBuddyModelInfo[];
 /**
  * The plugin's live catalog.
  *
@@ -657,9 +555,6 @@ declare function composeCatalog(upstream: readonly WorkBuddyModelInfo[], options
 declare class WorkBuddyCatalog {
   private upstream;
   private scope;
-  private readonly productConfig;
-  private readonly fallback;
-  private readonly priceAuthority;
   /**
    * Models the user switched off in the card. Kept here rather than folded into
    * `scope` because the two answer different questions: the scope decides which
@@ -668,7 +563,7 @@ declare class WorkBuddyCatalog {
    * switches behaves exactly as before.
    */
   private disabled;
-  constructor(options: WorkBuddyCatalogOptions);
+  constructor(options?: WorkBuddyCatalogOptions);
   /** Replace the upstream rows; the effective list is recomposed immediately. */
   setUpstream(models: readonly WorkBuddyModelInfo[]): void;
   /** The upstream rows as last received, before any policy is applied. */
@@ -691,14 +586,10 @@ declare class WorkBuddyCatalog {
   isDisabled(id: string): boolean;
   /** The active billing policy. */
   currentScope(): WorkBuddyModelScope;
-  /** The product configuration this catalog prices against. */
-  product(): WorkBuddyProductConfig;
-  /** The effective entries; the fallback list until the upstream answer lands. */
+  /** The effective entries; empty until the region's catalog arrives. */
   current(): readonly WorkBuddyModelInfo[];
   /** Every model in this region, before the free/all picker policy is applied. */
   all(): readonly WorkBuddyModelInfo[];
-  /** Whether this region trusts upstream model billing instead of global product data. */
-  usesUpstreamPricing(): boolean;
   /** Every model id this region prices as free. */
   freeIds(): readonly string[];
   /** Whether a model is free according to this region's authority. */
@@ -1198,9 +1089,7 @@ interface WorkBuddyWebRegion {
   probe?: WorkBuddyWebProbeSection;
   scope?: WorkBuddyModelScope$1;
   freeIds?: readonly string[];
-  priceSource?: 'cache' | 'builtin' | 'upstream';
-  priceSourcePath?: string;
-  endpoint?: string;
+  priceSource?: 'upstream';
   checkin?: WorkBuddyWebCheckin;
 }
 /** The JSON document the plugin card renders. */
@@ -1222,14 +1111,10 @@ type WorkBuddyWebStatus = {
   probe?: WorkBuddyWebProbeSection;
   /** The active billing policy. */
   scope?: WorkBuddyModelScope$1;
-  /** Model ids the product configuration prices free. */
+  /** Model ids the selected region's live catalog prices free. */
   freeIds?: readonly string[];
   /** Where the price data came from, for the card's provenance line. */
-  priceSource?: 'cache' | 'builtin' | 'upstream';
-  /** Path of the product configuration when one was read. */
-  priceSourcePath?: string;
-  /** Endpoint the product configuration points at, e.g. `https://www.workbuddy.ai`. */
-  endpoint?: string;
+  priceSource?: 'upstream';
   /**
    * In-process key authorizing control writes. Handed to the card with the
    * status document (the card is same-origin and already had to pass the
@@ -1341,7 +1226,7 @@ interface Config {
   probeConsent?: boolean;
   /**
    * Which models the picker may show. `free` (the default) lists only models the
-   * product configuration prices `x0.00`; `all` lifts the filter and makes paid
+   * region's live catalog prices `x0.00`; `all` lifts the filter and makes paid
    * models selectable, so their credit cost becomes real.
    */
   modelScope?: WorkBuddyModelScope;
@@ -1355,11 +1240,6 @@ interface Config {
   /** Same picker filter, for the domestic card. */
   cnDisabledModels?: string[];
   /**
-   * Explicit product-configuration path, overriding the app's own cache
-   * location. Only needed when the app keeps its state somewhere unusual.
-   */
-  productConfigFile?: string;
-  /**
    * Extra Host/Origin authorities for the settings card when DSH Web is
    * reached over LAN (e.g. `192.168.1.10`). Empty (the default) keeps the
    * card on loopback only. Never put LAN names into the loopback set.
@@ -1369,10 +1249,10 @@ interface Config {
 declare const Config: z<Config>;
 /**
  * Start the loopback endpoint, register the `workbuddy-ai` provider, and refresh
- * the model catalog from the upstream once credentials allow it. The static
- * fallback catalog serves from the first moment, so an offline upstream never
- * leaves the provider empty.
+ * the model catalog from the upstream once credentials allow it. The list is
+ * empty until a region answers: both regions are priced from their own live
+ * catalog, so there is no local list to fall back to.
  */
 declare function apply(ctx: Context, config: Config): void;
 //#endregion
-export { BUILTIN_CREDITS, BUILTIN_FREE_MODELS, Config, FALLBACK_EXTRA_MODELS, FALLBACK_FREE_MODEL_IDS, FALLBACK_WORKBUDDY_MODELS, LOGIN_TIMEOUT_MS, PROBE_EFFORT_CANDIDATES, type ProbeAttempt, type ProbeOutcome, type ProbeSender, type UpstreamErrorKind, WORKBUDDY_AUTH_FILENAME, WORKBUDDY_AUTH_FILE_ENV, WORKBUDDY_CN_AUTH_FILENAME, WORKBUDDY_CN_AUTH_FILE_ENV, WORKBUDDY_CN_DESKTOP_AUTH_BASENAME, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_CONTROL_PATH, WORKBUDDY_DESKTOP_AUTH_BASENAME, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_HOST_HEARTBEAT_FILENAME, WORKBUDDY_PROBE_FILENAME, WORKBUDDY_PROVIDER, WORKBUDDY_SETTINGS_NS, WORKBUDDY_STATUS_PATH, WorkBuddyAccountStore, type WorkBuddyAccountSummary, type WorkBuddyAdapter, type WorkBuddyAuthStatus, WorkBuddyCatalog, type WorkBuddyChatResult, type WorkBuddyControlAction, type WorkBuddyCredential, WorkBuddyCredentialStore, type WorkBuddyCredentialStoreLike, type WorkBuddyCredits, type WorkBuddyEffort, type WorkBuddyGrowthStatus, type WorkBuddyHostHeartbeat, type WorkBuddyModelBilling, type WorkBuddyModelInfo, type WorkBuddyModelReasoning, type WorkBuddyModelScope, WorkBuddyOAuthLogin, type WorkBuddyProbeRecord, WorkBuddyProbeService, type WorkBuddyProbeStatus, WorkBuddyProbeStore, type WorkBuddyProbeValidation, type WorkBuddyProductConfig, type WorkBuddyProductModel, type WorkBuddyRefreshOutcome, type WorkBuddyRegion, type WorkBuddyShim, WorkBuddyUpstreamClient, type WorkBuddyUpstreamModel, type WorkBuddyWebAccount, type WorkBuddyWebCheckin, type WorkBuddyWebModelBadge, type WorkBuddyWebProbeModel, type WorkBuddyWebProbeSection, type WorkBuddyWebRegion, type WorkBuddyWebStatus, apply, classifyUpstreamError, clearHostHeartbeat, composeCatalog, createWorkBuddyAdapter, createWorkBuddyShim, credentialFromPluginToken, defaultDesktopAuthCandidates, defaultDesktopAuthPath, fetchGrowthRewardToday, fetchGrowthStatus, fingerprintModel, freeModelIds, inject, isFreeCredits, isHeartbeatProcessAlive, loadProductConfig, name, normalizeCredits, parseProductConfig, parseWorkBuddyAuth, prepareChatBody, probeModel, processStartTimeMs, randomSentinel, readHostHeartbeat, reasoningFields, regionOf, runGrowthTrip, workBuddyHostHeartbeatPath, workBuddyOwnAuthPath, workBuddyProbePath, workBuddyProductConfigPath, workBuddyRegionOwnAuthPath };
+export { Config, LOGIN_TIMEOUT_MS, PROBE_EFFORT_CANDIDATES, type ProbeAttempt, type ProbeOutcome, type ProbeSender, type UpstreamErrorKind, WORKBUDDY_AUTH_FILENAME, WORKBUDDY_AUTH_FILE_ENV, WORKBUDDY_CN_AUTH_FILENAME, WORKBUDDY_CN_AUTH_FILE_ENV, WORKBUDDY_CN_DESKTOP_AUTH_BASENAME, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_CONTROL_PATH, WORKBUDDY_DESKTOP_AUTH_BASENAME, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_HOST_HEARTBEAT_FILENAME, WORKBUDDY_PROBE_FILENAME, WORKBUDDY_PROVIDER, WORKBUDDY_SETTINGS_NS, WORKBUDDY_STATUS_PATH, WorkBuddyAccountStore, type WorkBuddyAccountSummary, type WorkBuddyAdapter, type WorkBuddyAuthStatus, WorkBuddyCatalog, type WorkBuddyChatResult, type WorkBuddyControlAction, type WorkBuddyCredential, WorkBuddyCredentialStore, type WorkBuddyCredentialStoreLike, type WorkBuddyCredits, type WorkBuddyEffort, type WorkBuddyGrowthStatus, type WorkBuddyHostHeartbeat, type WorkBuddyModelBilling, type WorkBuddyModelInfo, type WorkBuddyModelReasoning, type WorkBuddyModelScope, WorkBuddyOAuthLogin, type WorkBuddyProbeRecord, WorkBuddyProbeService, type WorkBuddyProbeStatus, WorkBuddyProbeStore, type WorkBuddyProbeValidation, type WorkBuddyRefreshOutcome, type WorkBuddyRegion, type WorkBuddyShim, WorkBuddyUpstreamClient, type WorkBuddyUpstreamModel, type WorkBuddyWebAccount, type WorkBuddyWebCheckin, type WorkBuddyWebModelBadge, type WorkBuddyWebProbeModel, type WorkBuddyWebProbeSection, type WorkBuddyWebRegion, type WorkBuddyWebStatus, apply, classifyUpstreamError, clearHostHeartbeat, composeCatalog, createWorkBuddyAdapter, createWorkBuddyShim, credentialFromPluginToken, defaultDesktopAuthCandidates, defaultDesktopAuthPath, fetchGrowthRewardToday, fetchGrowthStatus, fingerprintModel, inject, isFreeCredits, isHeartbeatProcessAlive, name, normalizeCredits, parseWorkBuddyAuth, prepareChatBody, probeModel, processStartTimeMs, randomSentinel, readHostHeartbeat, reasoningFields, regionOf, runGrowthTrip, workBuddyHostHeartbeatPath, workBuddyOwnAuthPath, workBuddyProbePath, workBuddyRegionOwnAuthPath };

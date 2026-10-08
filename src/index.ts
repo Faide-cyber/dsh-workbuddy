@@ -31,7 +31,6 @@ import { WorkBuddyProbeService } from './probe-service.ts'
 import { newestFirst, WorkBuddyProbeStore } from './probe-store.ts'
 import { acceptGrowthTasks, claimGrowthTask, fetchGrowthRewardToday, fetchGrowthStatus, fetchGrowthTasks, reportGrowthEvents, runGrowthTrip, WorkBuddyUpstreamClient, type WorkBuddyGrowthStatus, type WorkBuddyGrowthTask } from './upstream.ts'
 import { buildGrowthEvent, GROWTH_NIGHT_KINDS, growthTaskSpec, inGrowthNightWindow, isSkippedGrowthTask } from './growth-tasks.ts'
-import { loadProductConfig } from './product-config.ts'
 import { createProviderRows, type ProviderRows } from './provider-rows.ts'
 import { registerWorkBuddyStatusRoute } from './web-status.ts'
 import { createControlKey, registerWorkBuddyControlRoute } from './control-route.ts'
@@ -54,23 +53,10 @@ export {
 export { createWorkBuddyShim, type WorkBuddyShim } from './shim.ts'
 export {
   composeCatalog,
-  FALLBACK_WORKBUDDY_MODELS,
   WorkBuddyCatalog,
   type WorkBuddyModelInfo,
   type WorkBuddyModelScope,
 } from './catalog.ts'
-export {
-  BUILTIN_CREDITS,
-  BUILTIN_FREE_MODELS,
-  FALLBACK_EXTRA_MODELS,
-  FALLBACK_FREE_MODEL_IDS,
-  freeModelIds,
-  loadProductConfig,
-  parseProductConfig,
-  workBuddyProductConfigPath,
-  type WorkBuddyProductConfig,
-  type WorkBuddyProductModel,
-} from './product-config.ts'
 export {
   fingerprintModel,
   WorkBuddyProbeStore,
@@ -187,7 +173,7 @@ export interface Config {
   probeConsent?: boolean
   /**
    * Which models the picker may show. `free` (the default) lists only models the
-   * product configuration prices `x0.00`; `all` lifts the filter and makes paid
+   * region's live catalog prices `x0.00`; `all` lifts the filter and makes paid
    * models selectable, so their credit cost becomes real.
    */
   modelScope?: WorkBuddyModelScope
@@ -200,11 +186,6 @@ export interface Config {
   disabledModels?: string[]
   /** Same picker filter, for the domestic card. */
   cnDisabledModels?: string[]
-  /**
-   * Explicit product-configuration path, overriding the app's own cache
-   * location. Only needed when the app keeps its state somewhere unusual.
-   */
-  productConfigFile?: string
   /**
    * Extra Host/Origin authorities for the settings card when DSH Web is
    * reached over LAN (e.g. `192.168.1.10`). Empty (the default) keeps the
@@ -232,17 +213,15 @@ export const Config: z<Config> = z.object({
     .description('International models the model picker should not list (already-selected models keep working)'),
   cnDisabledModels: z.array(z.string()).default([])
     .description('Domestic models the model picker should not list (already-selected models keep working)'),
-   productConfigFile: z.string()
-    .description('Product configuration supplying model prices (defaults to the app\'s own cache)'),
   allowedHosts: z.array(z.string()).default([])
     .description('Extra Host names for the plugin card when DSH Web is opened over LAN (empty = loopback only)'),
 })
 
 /**
  * Start the loopback endpoint, register the `workbuddy-ai` provider, and refresh
- * the model catalog from the upstream once credentials allow it. The static
- * fallback catalog serves from the first moment, so an offline upstream never
- * leaves the provider empty.
+ * the model catalog from the upstream once credentials allow it. The list is
+ * empty until a region answers: both regions are priced from their own live
+ * catalog, so there is no local list to fall back to.
  */
 export function apply(ctx: Context, config: Config): void {
   const client = new WorkBuddyUpstreamClient()
@@ -259,31 +238,15 @@ export function apply(ctx: Context, config: Config): void {
   const oauth = new WorkBuddyOAuthLogin(client, undefined, 'global')
   const cnOauth = new WorkBuddyOAuthLogin(client, undefined, 'cn')
 
-  // Prices and the omitted-model rows come from the app's product configuration,
-  // resolved once at startup: it is a cache the app rewrites on its own schedule,
-  // and a mid-session change would silently alter what the picker offers.
-  const productConfig = loadProductConfig(
-    config.productConfigFile !== undefined && config.productConfigFile.trim() !== ''
-      ? config.productConfigFile.trim()
-      : undefined,
-  )
-  // Live configuration source: the composed config, replaced by the settings
-  // section's source once one is installed. `saved` is the card-driven layer on
-  // top of it, backed by this plugin's own file — see `settings-file.ts` for
-  // why the settings service is not trusted as the write path here.
   let base = (): Config => config
   const saved: Partial<Config> = sanitizeSavedConfig(readWorkBuddySettings())
   const current = (): Config => ({ ...base(), ...saved })
 
   const catalog = new WorkBuddyCatalog({
-    productConfig,
     scope: current().modelScope ?? 'free',
   })
   const cnCatalog = new WorkBuddyCatalog({
-    productConfig,
     scope: current().cnModelScope ?? current().modelScope ?? 'free',
-    fallback: false,
-     priceAuthority: 'upstream',
   })
   // Seeded from the card's own file, not just the composed config. A host whose
   // settings service has no `register()` never runs the inject callback below,

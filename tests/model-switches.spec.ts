@@ -13,7 +13,7 @@ import { WorkBuddyCatalog } from '../src/catalog.ts'
 import { applyModelSwitchWrite } from '../src/model-switches.ts'
 
 function fixture(ids: readonly string[] = []): WorkBuddyCatalog {
-  const catalog = new WorkBuddyCatalog({ productConfig: { source: 'builtin', models: [] }, scope: 'all' })
+  const catalog = new WorkBuddyCatalog({ scope: 'all' })
   catalog.setDisabled(ids)
   return catalog
 }

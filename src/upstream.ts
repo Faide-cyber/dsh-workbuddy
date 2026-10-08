@@ -12,11 +12,13 @@
  *    {@link WorkBuddyUpstreamClient.fetchModels} therefore picks the path from
  *    the credential's own `domain`, so a `.ai` sign-in can never be sent to the
  *    domestic path.
- * 2. **The catalog is not the authority on price.** It lists `hy4-preview` at
- *    `x0.00` while the app's product configuration prices it `x0.29`, and it
- *    omits two genuinely free models entirely. Free/paid is therefore decided
- *    from the product configuration (see `product-config.ts`), never from this
- *    endpoint's `credits` field alone.
+ * 2. **The catalog is the only authority on price.** Its `credits` field is what
+ *    the plugin quotes, as-is. Note that `credits` is the *displayed* price
+ *    after any active promotion: a `modelPromotions` entry with
+ *    `discount.factor = 0` and `displayMode = 'replace'` makes a paid model read
+ *    `x0.00` for the promotion window. The plugin therefore mirrors whatever the
+ *    region currently publishes, including limited-time free tiers, rather than
+ *    second-guessing it with a local table.
  *
  * The wire behavior is ported from Sliverkiss/workbuddy2api (MIT), whose Go
  * implementation is battle-tested against the real endpoint.

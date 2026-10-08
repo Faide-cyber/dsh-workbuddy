@@ -108,10 +108,7 @@ export const en = {
   freeModel: 'Free',
   rate: '{rate} credits per message',
   contextWindow: 'Context {tokens}',
-  priceSourceCache: 'Prices read from the WorkBuddy app cache',
   priceSourceUpstream: 'Prices from the selected region’s live model catalog',
-  priceSourceBuiltin: 'Prices from the plugin’s built-in free list (the app cache was not readable)',
-  priceSourcePath: 'Source: {path}',
 
   probeHeading: 'Reasoning effort detection',
   probeIntro: 'Some models reason but declare no selectable effort levels. Detecting which levels a model accepts sends a few real requests that may consume credit.',
@@ -241,10 +238,7 @@ export const zh: Record<WorkBuddySettingsKey, string> = {
   freeModel: '免费',
   rate: '{rate} 积分/次',
   contextWindow: '上下文 {tokens}',
-  priceSourceCache: '价格读取自 WorkBuddy 应用缓存',
   priceSourceUpstream: '价格来自当前区域的实时模型目录',
-  priceSourceBuiltin: '价格来自插件内置的免费名单（未能读取应用缓存）',
-  priceSourcePath: '来源：{path}',
 
   probeHeading: '推理档位检测',
   probeIntro: '部分模型具备思考能力，但没有声明可选档位。检测会发送少量真实请求，可能消耗积分。',

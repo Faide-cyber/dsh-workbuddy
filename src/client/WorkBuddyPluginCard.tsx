@@ -466,7 +466,6 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
   const probe = signedIn ? activeRegion?.probe : undefined
   const models = signedIn ? (activeRegion?.models ?? []) : []
   const priceSource = activeRegion?.priceSource
-  const priceSourcePath = activeRegion?.priceSourcePath
   const autoCheckinEnabled = cardRegion === 'cn' ? activeRegion?.checkin?.enabled === true : signedInStatus?.autoCheckin === true
 
   // Search narrows what is shown; it never changes what a switch means.
@@ -1065,11 +1064,8 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                         <p style={modelRateStyle}>{t('modelsIntro')}</p>
                         <p style={modelRateStyle}>{t('modelsSwitchHint')}</p>
                         <p style={modelRateStyle}>
-                          {priceSource === 'upstream' ? t('priceSourceUpstream') : priceSource === 'builtin' ? t('priceSourceBuiltin') : t('priceSourceCache')}
+                          {priceSource === 'upstream' ? t('priceSourceUpstream') : ''}
                         </p>
-                        {priceSourcePath === undefined
-                          ? null
-                          : <p style={modelRateStyle}>{t('priceSourcePath', { path: priceSourcePath })}</p>}
                         {models.length === 0
                           ? <p style={bodyStyle}>{t('modelsEmpty')}</p>
                           : (

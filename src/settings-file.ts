@@ -74,7 +74,6 @@ const SAVED_FIELDS: { [K in keyof Config]-?: (value: unknown) => Config[K] | und
   cnModelScope: value => scope(value),
   disabledModels: value => strings(value),
   cnDisabledModels: value => strings(value),
-  productConfigFile: value => typeof value === 'string' ? value : undefined,
   allowedHosts: value => strings(value),
 }
 

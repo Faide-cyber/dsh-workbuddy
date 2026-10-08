@@ -134,9 +134,7 @@ export interface WorkBuddyWebRegion {
   probe?: WorkBuddyWebProbeSection
   scope?: WorkBuddyModelScope
   freeIds?: readonly string[]
-  priceSource?: 'cache' | 'builtin' | 'upstream'
-  priceSourcePath?: string
-  endpoint?: string
+  priceSource?: 'upstream'
   checkin?: WorkBuddyWebCheckin
 }
 
@@ -157,14 +155,10 @@ export type WorkBuddyWebStatus =
     probe?: WorkBuddyWebProbeSection
     /** The active billing policy. */
     scope?: WorkBuddyModelScope
-    /** Model ids the product configuration prices free. */
+    /** Model ids the selected region's live catalog prices free. */
     freeIds?: readonly string[]
     /** Where the price data came from, for the card's provenance line. */
-    priceSource?: 'cache' | 'builtin' | 'upstream'
-    /** Path of the product configuration when one was read. */
-    priceSourcePath?: string
-    /** Endpoint the product configuration points at, e.g. `https://www.workbuddy.ai`. */
-    endpoint?: string
+    priceSource?: 'upstream'
     /**
      * In-process key authorizing control writes. Handed to the card with the
      * status document (the card is same-origin and already had to pass the

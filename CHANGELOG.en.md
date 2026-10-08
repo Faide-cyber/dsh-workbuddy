@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.5] - 2026-10-09
+
+### Changed
+
+- **The local price table is gone; both regions now follow their own live catalog.** The plugin used to ship a built-in price and free-model list (`src/product-config.ts`) and to override the international catalog's `credits` with it. That file has been removed entirely: which models exist, their context and reasoning efforts, and their `credits` price are all taken verbatim from the region's catalog, so a new model or a price change reaches users immediately instead of waiting for a plugin release. The domestic region was already upstream-authoritative; the international one now matches it.
+- Consequently, an empty list before a region's catalog arrives is deliberate — no region borrows another region's lineup (the old three-model local fallback is gone).
+- `credits` is the displayed price after any limited-time promotion: `hy4-preview` reads `x0.00` during its promotion and `x0.29` outside it. The plugin no longer second-guesses it and simply mirrors what upstream publishes.
+- The `productConfigFile` config key and the `DSH_WORKBUDDY_PRODUCT_CONFIG` environment variable are removed; `doctor` no longer reports a product-config source and instead states that prices are read live from each region's catalog.
+- Both READMEs: the subtitle is now "no WorkBuddy desktop app required", the "Free models" section became "Models and prices" (live catalog, promotional discounts), and highlights 3–5 were rewritten (domestic one-click check-in / cat travel / growth tasks, live pricing, providers appearing per sign-in).
+
 ## [1.0.4] - 2026-10-09
 
 ### Fixed

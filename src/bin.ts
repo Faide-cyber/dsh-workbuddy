@@ -6,10 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { WorkBuddyCredentialStore, workBuddyOwnAuthPath, WORKBUDDY_AUTH_FILE_ENV } from './auth.ts'
 import { WorkBuddyOAuthLogin } from './oauth.ts'
 import { WorkBuddyUpstreamClient } from './upstream.ts'
-import { FALLBACK_WORKBUDDY_MODELS } from './catalog.ts'
 import { WORKBUDDY_VERSION } from './version.ts'
 import { isHeartbeatProcessAlive, readHostHeartbeat, workBuddyHostHeartbeatPath } from './host-heartbeat.ts'
-import { loadProductConfig, workBuddyProductConfigPath } from './product-config.ts'
 
 type Action = 'doctor' | 'login' | 'logout' | 'status'
 
@@ -51,7 +49,6 @@ async function doctor(jsonOutput: boolean): Promise<number> {
   const desktopPresent = await store.desktopFilePresent()
   const heartbeat = await readHostHeartbeat()
   const hostAlive = heartbeat !== undefined && isHeartbeatProcessAlive(heartbeat)
-  const product = loadProductConfig()
   const report = {
     schemaVersion: JSON_SCHEMA_VERSION,
     package: 'dsh-workbuddy',
@@ -62,13 +59,6 @@ async function doctor(jsonOutput: boolean): Promise<number> {
       present: desktopPresent,
     },
     ownAuthFile: workBuddyOwnAuthPath(),
-    productConfig: {
-      path: product.path ?? workBuddyProductConfigPath(),
-      source: product.source,
-      freeModels: product.source === 'cache'
-        ? product.models.filter(model => model.credits !== undefined && /^x?0(?:\.0+)?$/u.test(model.credits)).map(model => model.id)
-        : FALLBACK_WORKBUDDY_MODELS.map(model => model.id),
-    },
     hostHeartbeat: {
       path: workBuddyHostHeartbeatPath(),
       present: heartbeat !== undefined,
@@ -76,7 +66,6 @@ async function doctor(jsonOutput: boolean): Promise<number> {
       processAlive: hostAlive,
     },
     signIn: status.state,
-    fallbackModels: FALLBACK_WORKBUDDY_MODELS.length,
     hints: [
       ...status.state === 'signed-in' ? [] : ['Connect from the plugin card, or run: dsh plugin --profile web exec dsh-workbuddy login'],
       ...desktopPresent ? [] : ['Desktop auth file is optional; browser OAuth writes the plugin-owned copy instead.'],
@@ -89,11 +78,9 @@ async function doctor(jsonOutput: boolean): Promise<number> {
     process.stdout.write([
       `DSH WorkBuddy ${WORKBUDDY_VERSION} on ${process.version}`,
       `Desktop auth file: ${report.desktopAuthFile.present ? 'present' : 'missing'} (${report.desktopAuthFile.path})`,
-      `Product config: ${report.productConfig.source} (${report.productConfig.path})`,
-      `Free models: ${report.productConfig.freeModels.join(', ') || '(none)'}`,
+      'Model prices: read live from each region\'s own catalog (no local price table)',
       `Host bundle: ${hostAlive ? `running (pid ${heartbeat!.pid})` : heartbeat !== undefined ? 'stale heartbeat (process exited)' : 'not started'}`,
       `Sign-in state: ${report.signIn}`,
-      `Static fallback models: ${report.fallbackModels}`,
       ...report.hints.map(hint => `Hint: ${hint}`),
       '',
     ].join('\n'))
