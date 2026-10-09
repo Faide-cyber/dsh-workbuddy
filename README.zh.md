@@ -132,7 +132,6 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | 登录成功但没有模型 | 该区域目录请求失败或返回为空——检查网络与 token 是否仍有效；此时列表保持为空，不会借用另一区域的模型 |
 | `doctor` 显示 signed-out | 先 `login`，或确认国际版桌面 App 已登录 |
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
-| 模型显示 `x0.00` 但你以为要收费 | 它正处于限时免费活动期，活动结束后恢复原价 |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

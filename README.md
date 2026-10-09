@@ -132,7 +132,6 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | Signed in but no models | The region's catalog request failed or returned nothing — check connectivity and whether the token is still valid; the list stays empty rather than borrowing the other region's models |
 | `doctor` says signed-out | Run `login` first, or confirm the international desktop app is signed in |
 | Want paid models | Switch the scope to "All models" on the settings card — credits will be burned |
-| A model shows `x0.00` but you expected a price | It is inside a limited-time free promotion; the paid rate returns when the promotion ends |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor
