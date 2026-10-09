@@ -1,7 +1,7 @@
 {
   "name": "dsh-workbuddy",
   "displayName": "DSH WorkBuddy",
-  "description": "将 WorkBuddy 模型接入 DeepSeek Harness，支持浏览器 OAuth，模型与价格实时来自各区域目录 — WorkBuddy models (international and domestic) for DeepSeek Harness, browser OAuth, live per-region pricing.",
+  "description": "把 WorkBuddy 国内版和国际版的免费/付费模型接进 DeepSeek Harness —— 无需下载 WorkBuddy 桌面端 — WorkBuddy's free and paid models (domestic and international) for DeepSeek Harness, no desktop app required.",
   "version": "1.0.9",
   "author": "Faide-cyber",
   "keywords": [

@@ -1,7 +1,7 @@
 <h1 align="center">DSH WorkBuddy</h1>
 
 <p align="center">
-  <em>Bring WorkBuddy (domestic and international) models into DeepSeek Harness — no WorkBuddy desktop app required.</em>
+  <em>Bring WorkBuddy's free and paid models (domestic and international) into DeepSeek Harness — no WorkBuddy desktop app required.</em>
 </p>
 
 <p align="center">

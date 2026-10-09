@@ -1,7 +1,7 @@
 <h1 align="center">DSH WorkBuddy</h1>
 
 <p align="center">
-  <em>把 WorkBuddy 国内版与国际版模型接进 DeepSeek Harness —— 无需下载 WorkBuddy 桌面端。</em>
+  <em>把 WorkBuddy 国内版和国际版的免费/付费模型接进 DeepSeek Harness —— 无需下载 WorkBuddy 桌面端。</em>
 </p>
 
 <p align="center">
