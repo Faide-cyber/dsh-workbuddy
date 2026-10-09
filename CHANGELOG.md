@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.9] - 2026-10-09
+
+### 变更
+
+- 两版 README 的三张界面截图换回未经压缩的原图（`docs/card-accounts.png` / `docs/card-models.png` / `docs/model-picker.png`，共约 2.5 MB），细节清晰度恢复；npm 包体积随之增大。
+
 ## [1.0.8] - 2026-10-09
 
 ### 变更

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.9] - 2026-10-09
+
+### Changed
+
+- The three README screenshots (`docs/card-accounts.png`, `docs/card-models.png`, `docs/model-picker.png`) were replaced with the original, uncompressed captures (about 2.5 MB total), restoring fine detail at the cost of a larger npm package.
+
 ## [1.0.8] - 2026-10-09
 
 ### Changed
