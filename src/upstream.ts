@@ -850,12 +850,12 @@ export class WorkBuddyUpstreamClient {
       }
       return undefined
     }
-    // `streak_days` is the number of check-ins inside the activity window, not a
-    // consecutive run: the upstream answered 11 for a window whose `checkin_dates`
-    // has exactly 11 entries with two days missing. Report the field as it is;
-    // the card label says "check-ins this event", never "N-day streak", so the
-    // plugin never claims a streak the check-in site does not agree with.
-    const streakDays = numberField('streak_days', 'streakDays')
+    // `streak_days` is an activity-window total (11 check-ins with two days
+    // missing), so it is not the streak the growth-center page shows. The page's
+    // 连登天数 comes from `/activity/growth/streak` → `streak.days`; read that
+    // and fall back to the raw field only when the read fails.
+    const streakDays = await fetchGrowthStreakDays(credential).catch(() => undefined)
+      ?? numberField('streak_days', 'streakDays')
     const dailyCredit = numberField('daily_credit', 'dailyCredit')
     // `today_credit` is what today actually paid out; `daily_credit` is what the
     // streak day is worth in general. The card reports the former, so a bonus
@@ -1302,16 +1302,19 @@ export async function claimGrowthTask(
 }
 
 /**
- * Consecutive growth-plan sign-in days.
+ * Consecutive growth-plan check-in days (`streak.days`).
  *
- * Worth reading back after a report run: the upstream accepts a report it then
- * counts nowhere (a missing or wrong `userId` does exactly that, with HTTP 200),
- * and `days` staying at 0 is the only outward sign.
+ * This is the number the growth-center page shows as 连登天数, and the path has
+ * **no** `/v2` prefix: `/v2/activity/growth/streak` answers `404`, which is why
+ * this read used to come back empty and the card had no honest streak to show.
+ * The site's own rule (from the activity page): consecutive days of logging in
+ * and using WorkBuddy up to today, with a one-day tolerance window, reset every
+ * month.
  */
 export async function fetchGrowthStreakDays(credential: WorkBuddyCredential): Promise<number | undefined> {
   const result = await growthSoftRequest(
     credential,
-    growthUrl(credential, '/v2/activity/growth/streak'),
+    growthUrl(credential, '/activity/growth/streak'),
     'GET',
   )
   if (!result.ok) return undefined

@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.12] - 2026-10-18
+
+### 修复
+
+- **连登天数改为与官网 growth-center 同源**：1.0.11 显示的是上游 `streak_days`（活动期签到次数），与官网页面上的「本月已连登 N 天」不是同一个数。官网该数字来自 `GET /activity/growth/streak` 的 `streak.days`——**没有 `/v2` 前缀**（`/v2/activity/growth/streak` 返回 404，所以插件里那个读取函数一直拿到空值）。现在读这个端点，标签恢复为「连登 N 天」/「N-day streak」，仅在读取失败时退回 `streak_days`。
+
 ## [1.0.11] - 2026-10-18
 
 ### 修复

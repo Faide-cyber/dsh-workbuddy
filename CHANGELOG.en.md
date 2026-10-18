@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.12] - 2026-10-18
+
+### Fixed
+
+- **The streak number now comes from the same source as the growth-center page**: 1.0.11 showed the upstream `streak_days`, which is a check-in total for the activity window, not the "days in a row" figure the page renders. That figure is `GET /activity/growth/streak` → `streak.days` — **without** the `/v2` prefix (`/v2/activity/growth/streak` answers 404, which is why the plugin's reader always came back empty). The card reads that endpoint now and the label is back to "N-day streak" / 「连登 N 天」, falling back to `streak_days` only when the read fails.
+
 ## [1.0.11] - 2026-10-18
 
 ### Fixed

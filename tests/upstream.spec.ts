@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchGrowthRewardToday, fetchGrowthStatus, isFreeCredits, runGrowthTrip, WorkBuddyUpstreamClient } from '../src/upstream.ts'
 import type { WorkBuddyCredential } from '../src/auth.ts'
 
@@ -350,5 +350,45 @@ describe('growth trip', () => {
     // Yesterday's payout must not be reported as today's.
     script([records([{ travel_date: '2026-10-06', claimed_at: 1_791_259_718, reward_credit: 7 }])])
     expect(await fetchGrowthRewardToday(credential, '2026-10-07')).toBeUndefined()
+  })
+})
+
+describe('fetchCheckinStatus streak', () => {
+  const checkin = (streakDays: number): Response => new Response(JSON.stringify({
+    code: 0,
+    data: { active: true, today_checked_in: true, streak_days: streakDays, today_credit: 100 },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+  const streak = (days: number): Response => new Response(JSON.stringify({
+    code: 0,
+    data: { streak: { days, month_total_days: 5 } },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+  const seen: string[] = []
+
+  beforeEach(() => {
+    seen.length = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      seen.push(url)
+      return url.includes('/activity/growth/streak') ? streak(2) : checkin(11)
+    })
+  })
+
+  it('reports the growth-center streak, not the activity-window total', async () => {
+    // The card's 连登 number must match /activity/growth/streak — the same field
+    // the page renders. `streak_days` (11 here) counts every check-in.
+    const status = await new WorkBuddyUpstreamClient().fetchCheckinStatus(credential)
+    expect(status.streakDays).toBe(2)
+    expect(seen.some(url => url.endsWith('/activity/growth/streak'))).toBe(true)
+    expect(seen.some(url => url.includes('/v2/activity/growth/streak'))).toBe(false)
+  })
+
+  it('falls back to streak_days when the streak read fails', async () => {
+    vi.restoreAllMocks()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      return url.includes('/activity/growth/streak') ? new Response('nope', { status: 500 }) : checkin(11)
+    })
+    const status = await new WorkBuddyUpstreamClient().fetchCheckinStatus(credential)
+    expect(status.streakDays).toBe(11)
   })
 })
