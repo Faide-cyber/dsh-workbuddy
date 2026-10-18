@@ -25,7 +25,7 @@ import type {} from '@deepseek-ai/dsh-attachment'
 import { WorkBuddyAccountStore, type WorkBuddyCredential } from './auth.ts'
 import { WorkBuddyCatalog, type WorkBuddyModelScope } from './catalog.ts'
 import { applyModelSwitchWrite } from './model-switches.ts'
-import { createWorkBuddyAdapter, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_PROVIDER } from './adapter.ts'
+import { createWorkBuddyAdapter, declaredFixedEffort, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_PROVIDER } from './adapter.ts'
 import { createWorkBuddyShim } from './shim.ts'
 import { WorkBuddyProbeService } from './probe-service.ts'
 import { newestFirst, WorkBuddyProbeStore } from './probe-store.ts'
@@ -256,8 +256,8 @@ export function apply(ctx: Context, config: Config): void {
   cnStore.setDesktopPath(current().cnAuthFile)
   catalog.setDisabled(current().disabledModels ?? [])
   cnCatalog.setDisabled(current().cnDisabledModels ?? [])
-  const shim = createWorkBuddyShim({ store, client, catalog, logger: ctx.logger })
-  const cnShim = createWorkBuddyShim({ store: cnStore, client, catalog: cnCatalog, logger: ctx.logger })
+  const shim = createWorkBuddyShim({ store, client, catalog, logger: ctx.logger, onModelUnavailable: () => refreshModels() })
+  const cnShim = createWorkBuddyShim({ store: cnStore, client, catalog: cnCatalog, logger: ctx.logger, onModelUnavailable: () => refreshModels() })
   /**
    * Apply a card-driven config edit: in memory first, so the switch moves, then
    * to the file. A write failure propagates — the card renders it, and a silent
@@ -304,6 +304,8 @@ export function apply(ctx: Context, config: Config): void {
    */
   const isProbeCandidate = (info: WorkBuddyModelInfo): boolean => {
     if (info.reasoning?.supports !== true) return false
+    // A row with one fixed effort already has its control; nothing left to detect.
+    if (declaredFixedEffort(info) !== undefined) return false
     return (info.reasoning.supportedEfforts?.length ?? 0) === 0
   }
 

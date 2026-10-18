@@ -2,6 +2,17 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.10] - 2026-10-18
+
+### 修复
+
+- **正文偶现 `<analysis>` / `<summary>` 标签**：上游对一批模型（如国际版 `deepseek-v4.1-flash`、`balanced-model`、国内版 `hy3`、`deepseek-v4-pro`）只声明单个固定 `reasoning.effort`。插件此前把它当作「没有推理档位」，于是从不发送 `reasoning_effort`，上游便不建立 `reasoning_content` 通道，模型只能在正文里画推理草稿。现在这类模型以该固定档位声明推理能力并始终带上 `reasoning_effort`，同时不再进入推理探测队列。
+- **「连续签到 N 天」把活动期累计天数当成连续天数**：上游 `streak_days` 统计的是活动窗口内的签到总次数（实测「11 次」里有两天没签）。改为按 `checkin_dates` 计算真正以今天（或昨天）为终点的连续天数，字段缺失时才退回原值。
+
+### 新增
+
+- **模型列表按实际可用性收敛**：上游目录不声明账号级可见性，付费档模型（国际版 `primary-model`、`gpt-5.5` 等）要到真实请求才返回 `is not allowed for user type`。现在首次遇到该错误就把模型从选择器隐藏（会话内记忆、刷新目录时重置），已选该模型的会话照常工作。
+
 ## [1.0.9] - 2026-10-09
 
 ### 变更

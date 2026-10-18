@@ -24,6 +24,7 @@ import type { WorkBuddyCredentialStoreLike } from './auth.ts'
 import type { WorkBuddyProbeRecord } from './probe-store.ts'
 import type { WorkBuddyShim } from './shim.ts'
 import { normalizeCredits } from './upstream.ts'
+import type { WorkBuddyEffort } from './upstream.ts'
 
 /**
  * Provider route this bundle owns.
@@ -125,10 +126,18 @@ export interface WorkBuddyAdapter {
  * 1. **The declared set.** When the row declares a non-empty `supportedEfforts`,
  *    exactly those values are offered and nothing else. This always wins: an
  *    observation never widens or narrows a declared set.
- * 2. **A local observation.** A row with no declared set normally gets no
- *    control at all — its selectable set is client-side knowledge the catalog
- *    does not carry. If the user authorized a probe and it established that the
- *    upstream *validates* the parameter, the verified spellings are offered.
+ * 2. **A single fixed default.** Rows like `deepseek-v4.1-flash` declare no
+ *    `supportedEfforts` but do declare one `reasoning.effort` (and usually
+ *    `onlyReasoning: true`). That one value *is* the effort the row runs at;
+ *    upstream builds the `reasoning_content` channel only when the request
+ *    carries `reasoning_effort`. Reporting `reasoning: false` here kept the
+ *    parameter off the wire, so the model's `<analysis>` scaffolding landed in
+ *    the visible `content`. Offer exactly that one level.
+ * 3. **A local observation.** A row with no declared set and no fixed default
+ *    normally gets no control at all — its selectable set is client-side
+ *    knowledge the catalog does not carry. If the user authorized a probe and
+ *    it established that the upstream *validates* the parameter, the verified
+ *    spellings are offered.
  *
  * A `non-validating` observation deliberately yields no control: the upstream
  * accepts values that cannot exist, so every per-level acceptance it produced
@@ -138,6 +147,12 @@ export interface WorkBuddyAdapter {
  * never probed — disabling thinking is a separate capability that cannot be
  * inferred from per-level acceptance.
  */
+export function declaredFixedEffort(info: WorkBuddyModelInfo): WorkBuddyEffort | undefined {
+  const reasoning = info.reasoning
+  if (reasoning?.onlyReasoning !== true) return undefined
+  return reasoning.defaultEffort
+}
+
 export function reasoningFields(
   info: WorkBuddyModelInfo,
   observed?: WorkBuddyProbeRecord,
@@ -148,11 +163,14 @@ export function reasoningFields(
     return { reasoning: false }
   }
   const declared = reasoning.supportedEfforts
+  const fixed = declaredFixedEffort(info)
   const efforts = declared !== undefined && declared.length > 0
     ? declared
-    : observed?.validation === 'validating' && observed.efforts.length > 0
-      ? observed.efforts
-      : undefined
+    : fixed !== undefined
+      ? [fixed]
+      : observed?.validation === 'validating' && observed.efforts.length > 0
+        ? observed.efforts
+        : undefined
   if (efforts === undefined) {
     // Undeclared and unobserved (or observed as non-validating): no thinking
     // control, and no `reasoning_effort` on the wire.
@@ -322,6 +340,9 @@ class WorkBuddyPiAiAdapter extends PiAiAdapter {
       // `resolveModel` and the pi-ai snapshot keep it resolvable, and prompt
       // admission does not consult this list at all.
       .filter(model => !this.catalog.isDisabled(model.id))
+      // Same rule for models this account was refused: hidden from the picker,
+      // still resolvable so an already-selected session is not rewritten.
+      .filter(model => !this.catalog.isUnavailable(model.id))
       .map(model => {
         const info = this.infoFor(model.id)
         if (info === undefined) return model

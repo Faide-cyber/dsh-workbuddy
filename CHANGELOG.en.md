@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.10] - 2026-10-18
+
+### Fixed
+
+- **`<analysis>` / `<summary>` tags leaking into the reply body**: the upstream declares a single fixed `reasoning.effort` for a group of models (international `deepseek-v4.1-flash`, `balanced-model`; domestic `hy3`, `deepseek-v4-pro`). The plugin read that as "no reasoning control", so it never sent `reasoning_effort`, the upstream never opened the `reasoning_content` channel, and the model drafted its reasoning into the visible text. Those models now declare reasoning at their fixed level and always send `reasoning_effort`; they also no longer enter the reasoning probe queue.
+- **"N-day streak" counted window totals, not a streak**: the upstream `streak_days` field is the number of check-ins inside the activity window (measured: 11 check-ins with two missed days). The card now derives the run that actually ends today (or yesterday) from `checkin_dates`, falling back to the raw field only when the list is absent.
+
+### Added
+
+- **The model picker follows real availability**: the upstream catalog carries no per-account visibility, so paid-tier models (international `primary-model`, `gpt-5.5`, …) only answer `is not allowed for user type` on a real request. The first such failure now hides the model from the picker (remembered for the session, cleared on catalog refresh); sessions already using it keep working.
+
 ## [1.0.9] - 2026-10-09
 
 ### Changed

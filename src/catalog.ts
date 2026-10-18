@@ -72,6 +72,13 @@ export class WorkBuddyCatalog {
    * switches behaves exactly as before.
    */
   private disabled = new Set<string>()
+  /**
+   * Models the upstream refused for *this* account ("model [...] is not allowed
+   * for user type [...]"). The catalog never says who may use what — the refusal
+   * only shows up on a real request — so it is learned from failures and kept
+   * for the session. Not persisted: availability changes with the plan.
+   */
+  private unavailable = new Set<string>
 
   constructor(options: WorkBuddyCatalogOptions = {}) {
     this.scope = options.scope ?? 'free'
@@ -80,6 +87,19 @@ export class WorkBuddyCatalog {
   /** Replace the upstream rows; the effective list is recomposed immediately. */
   setUpstream(models: readonly WorkBuddyModelInfo[]): void {
     this.upstream = [...models]
+    // A refresh is the only evidence that availability may have changed (a plan
+    // upgrade, a new promo), so forget refusals and let the next request re-teach.
+    this.unavailable = new Set()
+  }
+
+  /** Record that the upstream refused this model for the signed-in account. */
+  markUnavailable(id: string): void {
+    this.unavailable.add(id)
+  }
+
+  /** Whether a previous request was refused for this account. */
+  isUnavailable(id: string): boolean {
+    return this.unavailable.has(id)
   }
 
   /** The upstream rows as last received, before any policy is applied. */

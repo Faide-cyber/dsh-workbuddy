@@ -563,9 +563,20 @@ declare class WorkBuddyCatalog {
    * switches behaves exactly as before.
    */
   private disabled;
+  /**
+   * Models the upstream refused for *this* account ("model [...] is not allowed
+   * for user type [...]"). The catalog never says who may use what — the refusal
+   * only shows up on a real request — so it is learned from failures and kept
+   * for the session. Not persisted: availability changes with the plan.
+   */
+  private unavailable;
   constructor(options?: WorkBuddyCatalogOptions);
   /** Replace the upstream rows; the effective list is recomposed immediately. */
   setUpstream(models: readonly WorkBuddyModelInfo[]): void;
+  /** Record that the upstream refused this model for the signed-in account. */
+  markUnavailable(id: string): void;
+  /** Whether a previous request was refused for this account. */
+  isUnavailable(id: string): boolean;
   /** The upstream rows as last received, before any policy is applied. */
   upstreamModels(): readonly WorkBuddyModelInfo[];
   /** Switch the billing policy; takes effect on the next {@link current} read. */
@@ -712,6 +723,11 @@ interface WorkBuddyShimOptions {
   store: WorkBuddyCredentialStoreLike;
   client: Pick<WorkBuddyUpstreamClient, 'chatStream'>;
   catalog: WorkBuddyCatalog;
+  /**
+   * Called after a refusal is recorded on the catalog, so the host can re-emit
+   * its model list and the picker stops offering a model this account cannot use.
+   */
+  onModelUnavailable?: (id: string) => void;
   logger?: ShimLogger;
 }
 /**
@@ -756,28 +772,6 @@ interface WorkBuddyAdapter {
   /** Rebuild the adapter's provider snapshot; call after a catalog update. */
   invalidate: () => void;
 }
-/**
- * Resolve a model's reasoning capability into pi-ai's `thinkingLevelMap` (every
- * level pinned to its wire spelling or `null` for unsupported).
- *
- * Two sources, strictly ordered:
- *
- * 1. **The declared set.** When the row declares a non-empty `supportedEfforts`,
- *    exactly those values are offered and nothing else. This always wins: an
- *    observation never widens or narrows a declared set.
- * 2. **A local observation.** A row with no declared set normally gets no
- *    control at all — its selectable set is client-side knowledge the catalog
- *    does not carry. If the user authorized a probe and it established that the
- *    upstream *validates* the parameter, the verified spellings are offered.
- *
- * A `non-validating` observation deliberately yields no control: the upstream
- * accepts values that cannot exist, so every per-level acceptance it produced
- * would be a false positive.
- *
- * `off` is offered only when the row declares `canDisableThinking: true`. It is
- * never probed — disabling thinking is a separate capability that cannot be
- * inferred from per-level acceptance.
- */
 declare function reasoningFields(info: WorkBuddyModelInfo, observed?: WorkBuddyProbeRecord): {
   reasoning: boolean;
   thinkingLevelMap?: ThinkingLevelMap;

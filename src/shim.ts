@@ -23,7 +23,7 @@ import { Readable } from 'node:stream'
 import type { WorkBuddyCredentialStoreLike } from './auth.ts'
 import type { WorkBuddyCatalog } from './catalog.ts'
 import { hostIsLoopback, originIsLoopback } from './loopback.ts'
-import { prepareChatBody, WorkBuddyUpstreamClient, type UpstreamErrorKind } from './upstream.ts'
+import { prepareChatBody, isModelNotAllowed, WorkBuddyUpstreamClient, type UpstreamErrorKind } from './upstream.ts'
 
 /** Minimal logger surface the plugin context already provides. */
 export interface ShimLogger {
@@ -53,6 +53,11 @@ export interface WorkBuddyShimOptions {
   store: WorkBuddyCredentialStoreLike
   client: Pick<WorkBuddyUpstreamClient, 'chatStream'>
   catalog: WorkBuddyCatalog
+  /**
+   * Called after a refusal is recorded on the catalog, so the host can re-emit
+   * its model list and the picker stops offering a model this account cannot use.
+   */
+  onModelUnavailable?: (id: string) => void
   logger?: ShimLogger
 }
 
@@ -101,6 +106,18 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
     req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
+}
+
+/** The `model` field of a prepared chat body, if it names one. */
+function modelOf(prepared: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(prepared)
+    if (typeof parsed !== 'object' || parsed === null) return undefined
+    const model = (parsed as Record<string, unknown>)['model']
+    return typeof model === 'string' && model !== '' ? model : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -218,6 +235,16 @@ export function createWorkBuddyShim(options: WorkBuddyShimOptions): WorkBuddyShi
     const result = await client.chatStream(credential, prepared, controller.signal)
 
     if (!result.ok) {
+      // A "not allowed for user type" refusal is a capability fact about this
+      // account, not a transient error: remember it so the picker stops offering
+      // a model that can only ever 400 here.
+      if (isModelNotAllowed(result.message)) {
+        const model = modelOf(prepared)
+        if (model !== undefined && !catalog.isUnavailable(model)) {
+          catalog.markUnavailable(model)
+          options.onModelUnavailable?.(model)
+        }
+      }
       writeOpenAIError(
         res,
         KIND_STATUS[result.kind],
