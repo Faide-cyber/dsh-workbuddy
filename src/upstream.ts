@@ -202,33 +202,6 @@ export function isModelNotAllowed(body: string): boolean {
   return MODEL_NOT_ALLOWED_MARKERS.some(marker => body.includes(marker))
 }
 
-/**
- * Count the consecutive check-in run ending today from `checkin_dates`.
- *
- * The upstream `streak_days` field counts *every* check-in inside the activity
- * window, so a 11-day window with two missed days still reports 11 — the card
- * then claims a streak that never happened. The date list is the only honest
- * source. Returns `undefined` when the list is absent or unparseable so the
- * caller can fall back to the upstream number.
- */
-export function consecutiveCheckinDays(raw: unknown): number | undefined {
-  if (!Array.isArray(raw)) return undefined
-  const dates = new Set<string>()
-  for (const entry of raw) {
-    if (typeof entry === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry)) dates.add(entry)
-  }
-  if (dates.size === 0) return undefined
-  const cursor = new Date()
-  // A run that has not been checked in yet today still counts yesterday's tail.
-  if (!dates.has(cursor.toLocaleDateString('en-CA'))) cursor.setDate(cursor.getDate() - 1)
-  let run = 0
-  while (dates.has(cursor.toLocaleDateString('en-CA'))) {
-    run++
-    cursor.setDate(cursor.getDate() - 1)
-  }
-  return run
-}
-
 /** Parse the upstream `reasoning` object into {@link WorkBuddyModelReasoning}. */
 function resolveUpstreamReasoning(wrapped: Record<string, unknown>): { reasoning: WorkBuddyModelReasoning } {
   const supports = wrapped['supportsReasoning'] === true
@@ -878,11 +851,11 @@ export class WorkBuddyUpstreamClient {
       return undefined
     }
     // `streak_days` is the number of check-ins inside the activity window, not a
-    // consecutive run: the upstream answered 11 while `checkin_dates` was missing
-    // 10-16 and 10-14. The card printed that as "11-day streak", so count the run
-    // from the date list instead and fall back to the raw field only when the
-    // list is absent.
-    const streakDays = consecutiveCheckinDays(nested['checkin_dates']) ?? numberField('streak_days', 'streakDays')
+    // consecutive run: the upstream answered 11 for a window whose `checkin_dates`
+    // has exactly 11 entries with two days missing. Report the field as it is;
+    // the card label says "check-ins this event", never "N-day streak", so the
+    // plugin never claims a streak the check-in site does not agree with.
+    const streakDays = numberField('streak_days', 'streakDays')
     const dailyCredit = numberField('daily_credit', 'dailyCredit')
     // `today_credit` is what today actually paid out; `daily_credit` is what the
     // streak day is worth in general. The card reports the former, so a bonus

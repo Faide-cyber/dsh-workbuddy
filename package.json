@@ -2,7 +2,7 @@
   "name": "dsh-workbuddy",
   "displayName": "DSH WorkBuddy",
   "description": "把 WorkBuddy 国内版和国际版的免费/付费模型接进 DeepSeek Harness —— 无需下载 WorkBuddy 桌面端 — WorkBuddy's free and paid models (domestic and international) for DeepSeek Harness, no desktop app required.",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "author": "Faide-cyber",
   "keywords": [
     "dsh-plugin",

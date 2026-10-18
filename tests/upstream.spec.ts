@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { consecutiveCheckinDays, fetchGrowthRewardToday, fetchGrowthStatus, isFreeCredits, runGrowthTrip, WorkBuddyUpstreamClient } from '../src/upstream.ts'
+import { fetchGrowthRewardToday, fetchGrowthStatus, isFreeCredits, runGrowthTrip, WorkBuddyUpstreamClient } from '../src/upstream.ts'
 import type { WorkBuddyCredential } from '../src/auth.ts'
 
 const credential: WorkBuddyCredential = {
@@ -350,29 +350,5 @@ describe('growth trip', () => {
     // Yesterday's payout must not be reported as today's.
     script([records([{ travel_date: '2026-10-06', claimed_at: 1_791_259_718, reward_credit: 7 }])])
     expect(await fetchGrowthRewardToday(credential, '2026-10-07')).toBeUndefined()
-  })
-})
-
-describe('consecutiveCheckinDays', () => {
-  const day = (offset: number): string => {
-    const date = new Date()
-    date.setDate(date.getDate() - offset)
-    return date.toLocaleDateString('en-CA')
-  }
-
-  it('counts the unbroken run ending today, not the whole window', () => {
-    // The real upstream answer: 11 check-ins in the window, but 10-16 and 10-14
-    // are missing, so the honest streak is shorter than the count.
-    expect(consecutiveCheckinDays([day(0), day(1), day(3), day(5), day(6)])).toBe(2)
-  })
-
-  it('still counts yesterday\'s tail when today is not checked in', () => {
-    expect(consecutiveCheckinDays([day(1), day(2), day(3)])).toBe(3)
-  })
-
-  it('returns undefined so the caller can fall back on the raw field', () => {
-    expect(consecutiveCheckinDays(undefined)).toBeUndefined()
-    expect(consecutiveCheckinDays([])).toBeUndefined()
-    expect(consecutiveCheckinDays(['nonsense'])).toBeUndefined()
   })
 })

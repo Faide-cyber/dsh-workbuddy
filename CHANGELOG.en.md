@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.11] - 2026-10-18
+
+### Fixed
+
+- **Reverted the 1.0.10 "streak" recomputation**: 1.0.10 derived a consecutive run from `checkin_dates`, inventing a third number — the upstream `streak_days` is a window total and the check-in site shows its own figure, so none of the three agreed. The card now reports the upstream `streak_days` verbatim and the label reads "N check-ins this event" instead of "N-day streak", so no streak is ever claimed.
+
 ## [1.0.10] - 2026-10-18
 
 ### Fixed

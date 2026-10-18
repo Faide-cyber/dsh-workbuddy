@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.11] - 2026-10-18
+
+### 修复
+
+- **撤回 1.0.10 的「连续签到天数」重算**：1.0.10 用 `checkin_dates` 自行推算连续天数，凭空造出了第三个数字——上游 `streak_days` 是活动期签到次数，站点又显示自己的口径，三方对不上。现在如实显示上游 `streak_days`，并把标签从「连续签到 N 天」改为「本活动内签到 N 次」/「N check-ins this event」，不再声称连续。
+
 ## [1.0.10] - 2026-10-18
 
 ### 修复
