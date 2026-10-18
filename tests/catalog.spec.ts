@@ -115,3 +115,22 @@ describe('per-model picker switches', () => {
     expect(catalog.disabledIds()).toEqual(['b'])
   })
 })
+
+describe('models the account may not use', () => {
+  it('remembers an upstream refusal and drops it on the next catalog refresh', () => {
+    // The catalog never declares per-account visibility, so the only source of
+    // truth is a real refusal. It must survive until the next catalog fetch,
+    // which is the only evidence that visibility may have changed.
+    const catalog = new WorkBuddyCatalog({ scope: 'all' })
+    catalog.setUpstream([paidHy4Preview, hy3])
+    expect(catalog.isUnavailable('hy4-preview')).toBe(false)
+
+    catalog.markUnavailable('hy4-preview')
+    expect(catalog.isUnavailable('hy4-preview')).toBe(true)
+    // Still resolvable: a session already on the model must not break.
+    expect(catalog.current().map(model => model.id)).toContain('hy4-preview')
+
+    catalog.setUpstream([paidHy4Preview, hy3])
+    expect(catalog.isUnavailable('hy4-preview')).toBe(false)
+  })
+})
