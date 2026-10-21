@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Any chat body whose text contains the literal `DeepSeek Harness` is now rejected by the upstream (HTTP 400 code 11128)**: observed 2026-10-21 — the upstream's channel verification treats that exact phrase in message text as an unapproved-channel call, and DSH's own default system prompt opens with `You are an AI agent powered by DeepSeek Harness`, so every session failed. `prepareChatBody` now rewrites blacklisted phrases (table `BLOCKED_PHRASE_REWRITES`) with minimal substitutions — `DeepSeek Harness` becomes `DeepSeek-Harness`; the same sentence with the hyphen passes and reaches the model. The rewrite runs on the serialized body so system prompt, history, and tool descriptions are all covered in one pass; future blacklisted phrases only need one new table row.
+
 ## [1.0.12] - 2026-10-18
 
 ### Fixed

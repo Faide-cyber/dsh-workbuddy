@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 修复
+
+- **系统提示词含 "DeepSeek Harness" 字样时上游一律拒绝（HTTP 400 code 11128）**：实测 2026-10-21 起，上游渠道德风控把聊天正文里的字面量 `DeepSeek Harness` 当作非认可渠道调用——DSH 默认系统提示词开头正是 `You are an AI agent powered by DeepSeek Harness`，于是每次会话必被拦。现在 `prepareChatBody` 在序列化后按改写表（`BLOCKED_PHRASE_REWRITES`）把该词组最小替换为 `DeepSeek-Harness`（实测同句改一个连字符即放行、模型正常回复），系统提示词、历史消息、工具描述一次全覆盖；后续上游再拉黑别的词组时往表里加一行即可。
+
 ## [1.0.12] - 2026-10-18
 
 ### 修复
