@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchGrowthRewardToday, fetchGrowthStatus, isFreeCredits, runGrowthTrip, WorkBuddyUpstreamClient } from '../src/upstream.ts'
+import { fetchGrowthRewardToday, fetchGrowthStatus, isFreeCredits, prepareChatBody, runGrowthTrip, WorkBuddyUpstreamClient } from '../src/upstream.ts'
 import type { WorkBuddyCredential } from '../src/auth.ts'
 
 const credential: WorkBuddyCredential = {
@@ -390,5 +390,43 @@ describe('fetchCheckinStatus streak', () => {
     })
     const status = await new WorkBuddyUpstreamClient().fetchCheckinStatus(credential)
     expect(status.streakDays).toBe(11)
+  })
+})
+
+describe('prepareChatBody', () => {
+  it('rewrites the channel-blacklisted brand phrase in the system prompt', () => {
+    const body = JSON.stringify({
+      stream: false,
+      messages: [
+        { role: 'system', content: 'You are an AI agent powered by DeepSeek Harness.' },
+        { role: 'user', content: 'hi' },
+      ],
+    })
+    const out = JSON.parse(prepareChatBody(body))
+    expect(out.messages[0].content).toBe('You are an AI agent powered by DeepSeek-Harness.')
+  })
+
+  it('rewrites the blacklisted phrase wherever it appears, and only that phrase', () => {
+    const body = JSON.stringify({
+      messages: [
+        { role: 'system', content: 'x' },
+        { role: 'user', content: 'DeepSeek Harness vs DeepSeek Harnesses vs DeepSeek-Harness' },
+      ],
+    })
+    const out = JSON.parse(prepareChatBody(body))
+    expect(out.messages[1].content).toBe('DeepSeek-Harness vs DeepSeek-Harnesses vs DeepSeek-Harness')
+  })
+
+  it('forces streaming, keeps a valid body otherwise untouched', () => {
+    const body = JSON.stringify({
+      stream: false,
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'hi' },
+      ],
+    })
+    const out = JSON.parse(prepareChatBody(body))
+    expect(out.stream).toBe(true)
+    expect(out.messages[0].content).toBe('You are a helpful assistant.')
   })
 })
