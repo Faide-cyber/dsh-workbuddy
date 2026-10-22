@@ -121,6 +121,23 @@ function modelOf(prepared: string): string | undefined {
 }
 
 /**
+ * The effort this row always runs at, when it declares `onlyReasoning`.
+ *
+ * Returned to {@link prepareChatBody} so a request that selected no thinking
+ * level still carries `reasoning_effort`: without it the upstream builds no
+ * `reasoning_content` channel and the model's `<analysis>` scaffolding lands in
+ * the visible `content`.
+ */
+function fixedEffortOf(catalog: WorkBuddyCatalog, model: string | undefined): string | undefined {
+  if (model === undefined) return undefined
+  const info = catalog.upstreamModels().find(entry => entry.id === model)
+  // Mirrors `declaredFixedEffort` in adapter.ts; duplicated to keep shim.ts free
+  // of an import cycle back into the adapter.
+  const reasoning = info?.reasoning
+  return reasoning?.onlyReasoning === true ? reasoning.defaultEffort : undefined
+}
+
+/**
  * Start the loopback endpoint. Requests carry the shim's own bearer; the
  * upstream credential comes from the store alone and never reaches the caller.
  */
@@ -228,7 +245,7 @@ export function createWorkBuddyShim(options: WorkBuddyShimOptions): WorkBuddyShi
     }
 
     const raw = (await readBody(req)).toString('utf8')
-    const prepared = prepareChatBody(raw)
+    const prepared = prepareChatBody(raw, fixedEffortOf(catalog, modelOf(raw)))
 
     const controller = new AbortController()
     req.on('close', () => controller.abort())

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.13] - 2026-10-18
+
+### Fixed
+
+- **`<analysis>` / `<summary>` tags still surfaced in the reply body when no effort level was chosen**: 1.0.10 gave models with a fixed `reasoning.effort` a selectable level, but the selector has no default, so DSH sent requests without `reasoningEffort` — and with no level, pi-ai only sends `reasoning_effort` when `thinkingLevelMap.off` is a string; ours is `null`, so no field was sent at all, the upstream never opened a `reasoning_content` channel, and the model had to write its scratchpad into the body. The shim now backstops it: `fixedEffortOf()` reads the fixed effort the current region's catalog declares for that model, and `prepareChatBody()` fills it in when the request carries no `reasoning_effort`. Requests that already picked a level are untouched.
+
 ## [1.0.12] - 2026-10-18
 
 ### Fixed

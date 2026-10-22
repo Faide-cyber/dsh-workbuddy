@@ -456,10 +456,18 @@ function billingHeaders(credential: WorkBuddyCredential): Record<string, string>
  * but a session with an empty instruction set would otherwise fail every call,
  * so a minimal one is prepended rather than letting the request die.
  *
+ * A fourth rewrite is conditional: when the row is declared `onlyReasoning`
+ * (thinking cannot be switched off) and the body carries no `reasoning_effort`,
+ * the caller's fixed effort is injected. pi-ai only emits that parameter when an
+ * effort was actually selected *or* `thinkingLevelMap.off` is a wire value; with
+ * neither, the field is absent, upstream builds no `reasoning_content` channel,
+ * and the model's `<analysis>` scaffolding spills into the visible content.
+ *
  * @param source - the JSON request body pi-ai produced.
+ * @param fixedEffort - the effort to force when the body has none, if any.
  * @returns the rewritten body, or the input unchanged when it is not a JSON object.
  */
-export function prepareChatBody(source: string): string {
+export function prepareChatBody(source: string, fixedEffort?: string): string {
   let body: unknown
   try {
     body = JSON.parse(source)
@@ -472,6 +480,9 @@ export function prepareChatBody(source: string): string {
   normalizeDeveloperRole(obj)
   normalizeToolChoice(obj)
   ensureLeadingSystemMessage(obj)
+  if (fixedEffort !== undefined && obj['reasoning_effort'] === undefined) {
+    obj['reasoning_effort'] = fixedEffort
+  }
   return JSON.stringify(obj)
 }
 

@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.13] - 2026-10-18
+
+### 修复
+
+- **没选档位时正文仍漏 `<analysis>` / `<summary>` 标签**：1.0.10 只是让「上游只声明单个固定 `reasoning.effort`」的模型有了一个可选档位，但选择器没有默认值，于是 DSH 发出的请求不带 `reasoningEffort`；而没有档位时 pi-ai 只在 `thinkingLevelMap.off` 是字符串时才发 `reasoning_effort`，我们的 `off` 是 `null`，结果一个字段都不发，上游不建 `reasoning_content` 通道，模型只能把草稿写进正文。现在由 shim 兜底：`fixedEffortOf()` 按当前区域目录里该模型声明的固定 effort，`prepareChatBody()` 在请求本身没有 `reasoning_effort` 时补上；已显式选过档位的请求不受影响。
+
 ## [1.0.12] - 2026-10-18
 
 ### 修复
