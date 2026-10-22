@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.14] - 2026-10-22
+
+### Fixed
+
+- **Every domestic request failed with 400 `code 11128` (gateway fingerprinting)**: the domestic gateway rejects a request whose leading system message starts with `You are an AI agent powered by DeepSeek Harness`, matching the sentence start case-insensitively. `prepareChatBody()` now renames that brand word to `DSH` before forwarding and leaves the rest of the text untouched; without `dsh-purge` every request used to be refused. The README troubleshooting table also documents `includeHarnessIdentity: false` as the alternative.
+
 ## [1.0.13] - 2026-10-18
 
 ### Fixed

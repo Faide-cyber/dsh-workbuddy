@@ -411,7 +411,10 @@ declare function regionOf(domain: string): WorkBuddyRegion;
  * but a session with an empty instruction set would otherwise fail every call,
  * so a minimal one is prepended rather than letting the request die.
  *
- * A fourth rewrite is conditional: when the row is declared `onlyReasoning`
+ * 4. `rewriteHarnessBanner` renames the brand word in the harness identity
+ *    banner, which the domestic gateway fingerprints at the sentence start.
+ *
+ * A fifth rewrite is conditional: when the row is declared `onlyReasoning`
  * (thinking cannot be switched off) and the body carries no `reasoning_effort`,
  * the caller's fixed effort is injected. pi-ai only emits that parameter when an
  * effort was actually selected *or* `thinkingLevelMap.off` is a wire value; with

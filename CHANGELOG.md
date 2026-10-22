@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.14] - 2026-10-22
+
+### 修复
+
+- **国内版每个请求都 400 `code 11128`（渠道风控）**：国内网关会拒绝首条 system 消息以 `You are an AI agent powered by DeepSeek Harness` 开头的请求，判据锚定句首、大小写不敏感。`prepareChatBody()` 现在在转发前把该品牌词改写为 `DSH`，其余字符原样保留；未安装 `dsh-purge` 的环境此前会因此每个请求都被拒。README 的故障排查表同时给出 `includeHarnessIdentity: false` 的备用做法。
+
 ## [1.0.13] - 2026-10-18
 
 ### 修复

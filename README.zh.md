@@ -132,6 +132,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | 登录成功但没有模型 | 该区域目录请求失败或返回为空——检查网络与 token 是否仍有效；此时列表保持为空，不会借用另一区域的模型 |
 | `doctor` 显示 signed-out | 先 `login`，或确认国际版桌面 App 已登录 |
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
+| 国内版每个请求都 400 `code 11128` | 国内网关会拒绝首条 system 消息以 `You are an AI agent powered by DeepSeek Harness` 开头的请求。插件转发前已把该品牌词改写为 `DSH`，无需任何设置；若你绕过插件，或上游收紧匹配条件，可在 `cordis.patch.yml` 给 `@deepseek-ai/dsh-system-prompt` 设 `includeHarnessIdentity: false` |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

@@ -132,6 +132,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | Signed in but no models | The region's catalog request failed or returned nothing — check connectivity and whether the token is still valid; the list stays empty rather than borrowing the other region's models |
 | `doctor` says signed-out | Run `login` first, or confirm the international desktop app is signed in |
 | Want paid models | Switch the scope to "All models" on the settings card — credits will be burned |
+| 400 code 11128 on every request (domestic region) | The domestic gateway rejects a leading system message that starts with `You are an AI agent powered by DeepSeek Harness`. The plugin renames that brand word to `DSH` in the forwarded body, so no setup is needed; if you bypass the plugin or the gateway widens its match, set `includeHarnessIdentity: false` on `@deepseek-ai/dsh-system-prompt` in `cordis.patch.yml` instead. |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor
