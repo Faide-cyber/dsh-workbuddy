@@ -20,6 +20,27 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('chat headers', () => {
+  it('sends the conversation channel trio on international chat requests', async () => {
+    const seen: Headers[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      seen.push(new Headers(init?.headers))
+      return new Response('data: [DONE]\\n\\n', { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    })
+
+    const result = await new WorkBuddyUpstreamClient().chatStream(
+      { ...credential, domain: 'www.workbuddy.ai' },
+      JSON.stringify({ model: 'deepseek-v4.1-flash', stream: true, messages: [] }),
+    )
+
+    expect(result.ok).toBe(true)
+    const headers = seen[0]
+    for (const name of ['X-Conversation-ID', 'X-Conversation-Request-ID', 'X-Conversation-Message-ID']) {
+      expect(headers?.get(name) ?? '').toMatch(/^[0-9a-f]{32}$/u)
+    }
+  })
+})
+
 describe('fetchModels', () => {
   const model = (id: string, credits?: string): Record<string, unknown> => ({
     id,

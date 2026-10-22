@@ -437,23 +437,8 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
 
   const regionRows = useMemo(() => status !== undefined && status.status !== 'error' ? status.regions ?? [] : [], [status])
 
-  // Open on a signed-in region once, so a card whose only account is the
-  // international one does not start on an empty domestic tab. Guarded by a ref
-  // so it never overrides a tab the user picked afterwards.
-  const seededRegion = useRef(false)
-  useEffect(() => {
-    if (seededRegion.current || fixedRegion !== undefined) return
-    const signedIn = regionRows.find(region => region.signedIn === true)
-    if (signedIn === undefined) return
-    seededRegion.current = true
-    setRegionTab(signedIn.region)
-  }, [fixedRegion, regionRows])
-
-  // The selected tab always wins. It used to fall back to whichever region was
-  // signed in whenever the *tab's* region was not, which made the other region
-  // unreachable: with cn signed in, clicking 国际版 flipped straight back to cn,
-  // so a second region could never be added. The one-time seed below keeps the
-  // original intent (open on the signed-in region) without overriding a click.
+  // The combined card intentionally starts on domestic (`regionTab` is initialized
+  // to `cn` above); an explicit tab click or fixed provider region still wins.
   const cardRegion: 'cn' | 'global' = fixedRegion ?? regionTab
   const activeRegion: WorkBuddyWebRegion | undefined = regionRows.find(region => region.region === cardRegion)
   const signedInStatus = status?.status === 'signed-in' ? status : undefined

@@ -133,6 +133,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | `doctor` says signed-out | Run `login` first, or confirm the international desktop app is signed in |
 | Want paid models | Switch the scope to "All models" on the settings card — credits will be burned |
 | 400 code 11128 on every request (domestic region) | The domestic gateway rejects a leading system message that starts with `You are an AI agent powered by DeepSeek Harness`. The plugin renames that brand word to `DSH` in the forwarded body, so no setup is needed; if you bypass the plugin or the gateway widens its match, set `includeHarnessIdentity: false` on `@deepseek-ai/dsh-system-prompt` in `cordis.patch.yml` instead. |
+| 400 code 11128 `request illegal` on every request (international region) | The international gateway requires `X-Conversation-ID`, `X-Conversation-Request-ID`, and `X-Conversation-Message-ID`; the plugin now supplies them automatically. |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

@@ -2,6 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.15] - 2026-10-22
+
+### 修复
+
+- **国际版每个请求都 400 `code 11128`**：国际网关现在要求 `X-Conversation-ID`、`X-Conversation-Request-ID`、`X-Conversation-Message-ID` 会话头三元组；插件为每次 chat 请求自动生成并补齐 32 位十六进制 ID。
+- **插件面板首次打开默认显示国际版**：合并卡片现在固定从国内版开始，仍可手动切换到国际版。
+
 ## [1.0.14] - 2026-10-22
 
 ### 修复

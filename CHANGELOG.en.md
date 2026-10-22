@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.15] - 2026-10-22
+
+### Fixed
+
+- **Every international request failed with 400 `code 11128`**: the gateway now requires the `X-Conversation-ID`, `X-Conversation-Request-ID`, and `X-Conversation-Message-ID` conversation trio; the plugin generates and sends fresh 32-hex IDs for every chat request.
+- **The settings card opened on the international region by default**: the combined card now starts on the domestic region while still allowing an explicit switch to international.
+
 ## [1.0.14] - 2026-10-22
 
 ### Fixed

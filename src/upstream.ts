@@ -27,6 +27,7 @@
  * @module dsh-workbuddy/upstream
  */
 
+import { randomUUID } from 'node:crypto'
 import type { WorkBuddyCredential } from './auth.ts'
 import type { ProbeAttempt } from './probe.ts'
 import { PROBE_MAX_TOKENS, PROBE_PROMPT } from './probe.ts'
@@ -377,10 +378,26 @@ function commonHeaders(credential: WorkBuddyCredential): Record<string, string> 
   }
 }
 
+/**
+ * Conversation channel headers required by the international gateway.
+ *
+ * The gateway rejects a chat request with HTTP 400/code 11128 when any member of
+ * this trio is absent. The plugin has no stable DSH conversation id at this seam,
+ * so a fresh 32-hex id is the safe fallback for each outbound request.
+ */
+function conversationHeaders(): Record<string, string> {
+  return {
+    'X-Conversation-ID': randomUUID().replaceAll('-', ''),
+    'X-Conversation-Request-ID': randomUUID().replaceAll('-', ''),
+    'X-Conversation-Message-ID': randomUUID().replaceAll('-', ''),
+  }
+}
+
 /** Chat request headers, including the X-No-* conventions the official CLI uses. */
 function chatHeaders(credential: WorkBuddyCredential): Record<string, string> {
   return {
     ...commonHeaders(credential),
+    ...conversationHeaders(),
     'Content-Type': 'application/json',
     // Security boundary: a chat request never carries the refresh token.
     ...credential.uid === '' ? { 'X-No-User-Id': '1' } : { 'X-User-Id': credential.uid },

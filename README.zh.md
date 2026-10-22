@@ -133,6 +133,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | `doctor` 显示 signed-out | 先 `login`，或确认国际版桌面 App 已登录 |
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
 | 国内版每个请求都 400 `code 11128` | 国内网关会拒绝首条 system 消息以 `You are an AI agent powered by DeepSeek Harness` 开头的请求。插件转发前已把该品牌词改写为 `DSH`，无需任何设置；若你绕过插件，或上游收紧匹配条件，可在 `cordis.patch.yml` 给 `@deepseek-ai/dsh-system-prompt` 设 `includeHarnessIdentity: false` |
+| 国际版每个请求都 400 `code 11128` `request illegal` | 国际网关要求同时携带 `X-Conversation-ID`、`X-Conversation-Request-ID`、`X-Conversation-Message-ID`；插件现在会自动补齐。 |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor
