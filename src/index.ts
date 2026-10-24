@@ -79,6 +79,8 @@ export {
   defaultDesktopAuthCandidates,
   defaultDesktopAuthPath,
   parseWorkBuddyAuth,
+  parseWorkBuddyAuthIdentity,
+  normalizeAccountEdition,
   credentialFromPluginToken,
   WORKBUDDY_AUTH_FILE_ENV,
   WORKBUDDY_CN_AUTH_FILE_ENV,
@@ -92,6 +94,8 @@ export {
   workBuddyOwnAuthPath,
   workBuddyRegionOwnAuthPath,
   type WorkBuddyAccountSummary,
+  type WorkBuddyAccountEdition,
+  type WorkBuddyAuthIdentity,
   type WorkBuddyAuthStatus,
   type WorkBuddyCredential,
 } from './auth.ts'
@@ -396,6 +400,9 @@ export function apply(ctx: Context, config: Config): void {
     .slice(0, 300)
 
   const doCheckin = async (accountId: string): Promise<{ state: string; reason?: string }> => {
+    if (!(await cnStore.checkinSupported(accountId))) {
+      return { state: 'unsupported', reason: 'check-in is not available for education accounts' }
+    }
     try {
       const credential = await cnStore.resolveFor(accountId)
       const status = await client.fetchCheckinStatus(credential)
@@ -597,6 +604,9 @@ export function apply(ctx: Context, config: Config): void {
    * side and the card's poll picks the result up.
    */
   const checkinAndGrow = async (accountId: string): Promise<{ state: string; reason?: string; claimed?: number }> => {
+    if (!(await cnStore.checkinSupported(accountId))) {
+      return { state: 'unsupported', reason: 'check-in is not available for education accounts' }
+    }
     const result = await doCheckin(accountId)
     const growth = await runGrowth(accountId)
     let total = growth.claimed ?? 0
@@ -615,6 +625,7 @@ export function apply(ctx: Context, config: Config): void {
    */
   const refreshCheckinStates = async (): Promise<void> => {
     for (const account of await cnStore.accounts()) {
+      if (account.edition === 'education') continue
       try {
         const credential = await cnStore.resolveFor(account.id)
         checkinStates.set(account.id, await client.fetchCheckinStatus(credential))
@@ -649,7 +660,7 @@ export function apply(ctx: Context, config: Config): void {
     if (!autoCheckin()) return
     const day = today()
     for (const account of await cnStore.accounts()) {
-      if (!account.checkinEnabled) continue
+      if (account.edition === 'education' || !account.checkinEnabled) continue
       if (autoCheckinDone.get(account.id) === day) continue
       await doCheckin(account.id)
       await runGrowth(account.id)
@@ -776,6 +787,10 @@ export function apply(ctx: Context, config: Config): void {
          return await storeFor(region).setNote(accountId, note)
        },
        setCheckinEnabled: async (accountId, enabled) => {
+        if (!(await cnStore.checkinSupported(accountId))) {
+          await cnStore.setCheckinEnabled(accountId, false)
+          return
+        }
         await cnStore.setCheckinEnabled(accountId, enabled)
         if (enabled) {
           void refreshCredits()

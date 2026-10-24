@@ -28,6 +28,9 @@ import { basename, dirname, join } from 'node:path'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import type { WorkBuddyCredits, WorkBuddyRefreshOutcome, WorkBuddyRegion } from './upstream.ts'
+import type { WorkBuddyAccountEdition } from './status-paths.ts'
+
+export type { WorkBuddyAccountEdition } from './status-paths.ts'
 
 /** Normalized WorkBuddy credential, timestamps in epoch milliseconds. */
 export interface WorkBuddyCredential {
@@ -39,6 +42,8 @@ export interface WorkBuddyCredential {
   uid: string
   enterpriseId?: string
   nickname?: string
+  /** Official account type; absent means an older auth file had no type field. */
+  edition?: WorkBuddyAccountEdition
   /** Which storage the credential was read from; refreshes are always `dsh`. */
   source: 'desktop' | 'dsh'
 }
@@ -50,6 +55,7 @@ export interface WorkBuddyAuthStatus {
   refreshExpiresAtMs?: number
   nickname?: string
   domain?: string
+  edition?: WorkBuddyAccountEdition
   source?: 'desktop' | 'dsh'
 }
 
@@ -182,6 +188,24 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined
 }
 
+/** Normalize the official account `type` field without guessing from entitlements. */
+export function normalizeAccountEdition(value: unknown): WorkBuddyAccountEdition | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'personal') return 'personal'
+  if (normalized === 'education') return 'education'
+  if (normalized === 'unknown') return 'unknown'
+  return undefined
+}
+
+function firstAccountEdition(...values: readonly unknown[]): WorkBuddyAccountEdition | undefined {
+  for (const value of values) {
+    const edition = normalizeAccountEdition(value)
+    if (edition !== undefined) return edition
+  }
+  return undefined
+}
+
 function normalizeAccountNote(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const note = value.trim().replace(/\s+/gu, ' ')
@@ -193,7 +217,7 @@ function normalizeAccountNote(value: unknown): string | undefined {
  * nested form `{"auth":{...},"account":{...}}` and the flat panel form.
  * Returns undefined when the document carries no access token.
  */
-export function parseWorkBuddyAuth(text: string): WorkBuddyCredential | undefined {
+function parseAuthDocument(text: string): { document: Record<string, unknown>; auth: Record<string, unknown>; identity: Record<string, unknown> } | undefined {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
@@ -213,12 +237,51 @@ export function parseWorkBuddyAuth(text: string): WorkBuddyCredential | undefine
     auth = document
     identity = document
   }
+  return { document, auth, identity }
+}
+
+export interface WorkBuddyAuthIdentity {
+  uid?: string
+  edition?: WorkBuddyAccountEdition
+}
+
+/** Read token-free official account identity, including encrypted desktop auth files. */
+export function parseWorkBuddyAuthIdentity(text: string): WorkBuddyAuthIdentity | undefined {
+  const parsed = parseAuthDocument(text)
+  if (parsed === undefined) return undefined
+  const { document, identity } = parsed
+  const uid = optionalString(identity['uid'])
+  const edition = firstAccountEdition(
+    identity['type'],
+    identity['accountType'],
+    identity['edition'],
+    document['type'],
+    document['accountType'],
+  )
+  if (uid === undefined && edition === undefined) return undefined
+  return {
+    ...uid === undefined ? {} : { uid },
+    ...edition === undefined ? {} : { edition },
+  }
+}
+
+export function parseWorkBuddyAuth(text: string): WorkBuddyCredential | undefined {
+  const parsed = parseAuthDocument(text)
+  if (parsed === undefined) return undefined
+  const { document, auth, identity } = parsed
   const accessToken = typeof auth['accessToken'] === 'string' ? auth['accessToken'] : ''
   if (accessToken === '') return undefined
   const expiresAtMs = typeof auth['expiresAt'] === 'number' ? expiryToMs(auth['expiresAt']) : 0
   const refreshExpiresAtMs = typeof auth['refreshExpiresAt'] === 'number' ? expiryToMs(auth['refreshExpiresAt']) : undefined
   const enterpriseId = optionalString(identity['enterpriseId'])
   const nickname = optionalString(identity['nickname'])
+  const edition = firstAccountEdition(
+    identity['type'],
+    identity['accountType'],
+    identity['edition'],
+    document['type'],
+    document['accountType'],
+  )
   return {
     accessToken,
     refreshToken: typeof auth['refreshToken'] === 'string' ? auth['refreshToken'] : '',
@@ -228,6 +291,7 @@ export function parseWorkBuddyAuth(text: string): WorkBuddyCredential | undefine
     uid: optionalString(identity['uid']) ?? '',
     ...enterpriseId === undefined ? {} : { enterpriseId },
     ...nickname === undefined ? {} : { nickname },
+    ...edition === undefined ? {} : { edition },
     source: 'desktop',
   }
 }
@@ -264,6 +328,24 @@ export function credentialFromPluginToken(data: Record<string, unknown>, region:
   const nickname = optionalString(payload['nickname'])
     ?? optionalString(payload['name'])
     ?? optionalString(data['nickname'])
+  const payloadAccount = typeof payload['account'] === 'object' && payload['account'] !== null && !Array.isArray(payload['account'])
+    ? payload['account'] as Record<string, unknown>
+    : {}
+  const dataAccount = typeof data['account'] === 'object' && data['account'] !== null && !Array.isArray(data['account'])
+    ? data['account'] as Record<string, unknown>
+    : {}
+  const edition = firstAccountEdition(
+    payload['type'],
+    payload['accountType'],
+    payload['edition'],
+    payloadAccount['type'],
+    payloadAccount['accountType'],
+    data['type'],
+    data['accountType'],
+    data['edition'],
+    dataAccount['type'],
+    dataAccount['accountType'],
+  )
   return {
     accessToken,
     refreshToken: typeof data['refreshToken'] === 'string' ? data['refreshToken'] : '',
@@ -272,6 +354,7 @@ export function credentialFromPluginToken(data: Record<string, unknown>, region:
     uid,
     ...enterpriseId === undefined ? {} : { enterpriseId },
     ...nickname === undefined ? {} : { nickname },
+    ...edition === undefined ? {} : { edition },
     source: 'dsh',
   }
 }
@@ -308,6 +391,7 @@ function parseOwnDocument(text: string): WorkBuddyCredential | undefined {
   const refreshExpiresAtMs = typeof stored['refreshExpiresAtMs'] === 'number' ? stored['refreshExpiresAtMs'] : undefined
   const enterpriseId = optionalString(stored['enterpriseId'])
   const nickname = optionalString(stored['nickname'])
+  const edition = firstAccountEdition(stored['edition'], stored['type'], stored['accountType'])
   return {
     accessToken,
     refreshToken: typeof stored['refreshToken'] === 'string' ? stored['refreshToken'] : '',
@@ -317,6 +401,7 @@ function parseOwnDocument(text: string): WorkBuddyCredential | undefined {
     uid: optionalString(stored['uid']) ?? '',
     ...enterpriseId === undefined ? {} : { enterpriseId },
     ...nickname === undefined ? {} : { nickname },
+    ...edition === undefined ? {} : { edition },
     source: 'dsh',
   }
 }
@@ -433,6 +518,7 @@ export class WorkBuddyCredentialStore implements WorkBuddyCredentialStoreLike {
         ...credential.refreshExpiresAtMs === undefined ? {} : { refreshExpiresAtMs: credential.refreshExpiresAtMs },
         ...credential.nickname === undefined ? {} : { nickname: credential.nickname },
         ...credential.domain === '' ? {} : { domain: credential.domain },
+        ...credential.edition === undefined ? {} : { edition: credential.edition },
         source: credential.source,
       }
     } catch {
@@ -549,6 +635,7 @@ export interface WorkBuddyAccountSummary {
   note?: string
   domain?: string
   source: 'desktop' | 'dsh'
+  edition: WorkBuddyAccountEdition
   expiresAtMs: number
   selected: boolean
   checkinEnabled: boolean
@@ -582,11 +669,17 @@ function normalizeRegionCredential(region: WorkBuddyRegion, credential: WorkBudd
   return { ...credential, domain: defaultRegionDomain(region) }
 }
 
+function mergeAccountEdition(base: WorkBuddyCredential, incoming: WorkBuddyCredential): WorkBuddyCredential {
+  return incoming.edition === undefined ? base : { ...base, edition: incoming.edition }
+}
+
+function accountIdForUid(region: WorkBuddyRegion, uid: string): string {
+  return `${region}-${createHash('sha256').update(uid).digest('hex').slice(0, 20)}`
+}
+
 function accountIdFor(region: WorkBuddyRegion, credential: WorkBuddyCredential): string {
-  const identity = credential.uid.trim() !== ''
-    ? credential.uid.trim()
-    : `${credential.domain}:${credential.accessToken}`
-  return `${region}-${createHash('sha256').update(identity).digest('hex').slice(0, 20)}`
+  if (credential.uid.trim() !== '') return accountIdForUid(region, credential.uid.trim())
+  return accountIdForUid(region, `${credential.domain}:${credential.accessToken}`)
 }
 
 function parseStoredCredential(value: unknown): WorkBuddyCredential | undefined {
@@ -595,6 +688,7 @@ function parseStoredCredential(value: unknown): WorkBuddyCredential | undefined 
   const accessToken = typeof stored['accessToken'] === 'string' ? stored['accessToken'] : ''
   if (accessToken === '') return undefined
   const source = stored['source'] === 'desktop' ? 'desktop' : 'dsh'
+  const edition = firstAccountEdition(stored['edition'], stored['type'], stored['accountType'])
   return {
     accessToken,
     refreshToken: typeof stored['refreshToken'] === 'string' ? stored['refreshToken'] : '',
@@ -604,6 +698,7 @@ function parseStoredCredential(value: unknown): WorkBuddyCredential | undefined 
     uid: typeof stored['uid'] === 'string' ? stored['uid'] : '',
     ...typeof stored['enterpriseId'] === 'string' ? { enterpriseId: stored['enterpriseId'] } : {},
     ...typeof stored['nickname'] === 'string' ? { nickname: stored['nickname'] } : {},
+    ...edition === undefined ? {} : { edition },
     source,
   }
 }
@@ -694,14 +789,25 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
     const primary = await this.readPrimary()
     if (primary !== undefined) {
       const id = accountIdFor(this.region, primary)
-      records.set(id, records.get(id) ?? { id, credential: primary, checkinEnabled: false })
+      const existing = records.get(id)
+      records.set(id, existing === undefined
+        ? { id, credential: primary, checkinEnabled: false }
+        : { ...existing, credential: mergeAccountEdition(existing.credential, primary) })
       if (this.selectedAccountId === undefined) this.selectedAccountId = id
     }
     const desktop = await this.readDesktopCredential()
     if (desktop !== undefined) {
       const id = accountIdFor(this.region, desktop)
-      records.set(id, records.get(id) ?? { id, credential: desktop, checkinEnabled: false })
+      const existing = records.get(id)
+      records.set(id, existing === undefined
+        ? { id, credential: desktop, checkinEnabled: false }
+        : { ...existing, credential: mergeAccountEdition(existing.credential, desktop) })
       if (this.selectedAccountId === undefined) this.selectedAccountId = id
+    }
+    const desktopIdentity = await this.readDesktopIdentity()
+    if (desktopIdentity?.uid !== undefined && desktopIdentity.edition !== undefined) {
+      const existing = records.get(accountIdForUid(this.region, desktopIdentity.uid))
+      if (existing !== undefined) existing.credential = { ...existing.credential, edition: desktopIdentity.edition }
     }
     this.records = [...records.values()]
     return this.records
@@ -721,6 +827,15 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
       try {
         const parsed = parseWorkBuddyAuth(await readFile(path, 'utf8'))
         return parsed === undefined ? undefined : normalizeRegionCredential(this.region, parsed)
+      } catch (error: unknown) { if (!isENOENT(error)) continue }
+    }
+    return undefined
+  }
+
+  private async readDesktopIdentity(): Promise<WorkBuddyAuthIdentity | undefined> {
+    for (const path of this.desktopCandidates()) {
+      try {
+        return parseWorkBuddyAuthIdentity(await readFile(path, 'utf8'))
       } catch (error: unknown) { if (!isENOENT(error)) continue }
     }
     return undefined
@@ -785,8 +900,9 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
       region: this.region,
       ...record.credential.nickname === undefined ? {} : { nickname: record.credential.nickname },
       ...record.note === undefined ? {} : { note: record.note },
-       ...record.credential.domain === '' ? {} : { domain: record.credential.domain },
+      ...record.credential.domain === '' ? {} : { domain: record.credential.domain },
       source: record.credential.source,
+      edition: record.credential.edition ?? 'unknown',
       expiresAtMs: record.credential.expiresAtMs,
       selected: record.id === this.selectedAccountId,
       checkinEnabled: record.checkinEnabled,
@@ -802,6 +918,11 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
   async credentialFor(accountId: string): Promise<WorkBuddyCredential | undefined> {
     const records = await this.readAccounts()
     return records.find(record => record.id === accountId)?.credential
+  }
+
+  async checkinSupported(accountId: string): Promise<boolean> {
+    const credential = await this.credentialFor(accountId)
+    return credential !== undefined && credential.edition !== 'education'
   }
 
   selectedId(): string | undefined { return this.selectedAccountId }
@@ -834,6 +955,7 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
       ...current.refreshExpiresAtMs === undefined ? {} : { refreshExpiresAtMs: current.refreshExpiresAtMs },
       ...current.nickname === undefined ? {} : { nickname: current.nickname },
       ...current.domain === '' ? {} : { domain: current.domain },
+      ...current.edition === undefined ? {} : { edition: current.edition },
       source: current.source,
     }
   }
@@ -893,7 +1015,7 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
     const id = accountId ?? accountIdFor(this.region, next)
     const existing = records.find(record => record.id === id)
     if (existing === undefined) records.push({ id, credential: next, checkinEnabled: false })
-    else existing.credential = next
+    else existing.credential = mergeAccountEdition(existing.credential, next)
     this.selectedAccountId = id
     await this.persist()
     return next

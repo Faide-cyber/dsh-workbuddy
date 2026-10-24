@@ -20,6 +20,9 @@ export const WORKBUDDY_CONTROL_KEY_HEADER = 'x-workbuddy-control-key'
  */
 export const WORKBUDDY_CONTROL_PATH = '/plugins/dsh-workbuddy/control'
 
+/** Official WorkBuddy account editions surfaced by the auth document. */
+export type WorkBuddyAccountEdition = 'personal' | 'education' | 'unknown'
+
 /** One model's recorded probe observation, as the card displays it. */
 export interface WorkBuddyWebProbeModel {
   id: string
@@ -99,6 +102,7 @@ export interface WorkBuddyWebAccount {
   note?: string
   domain?: string
   source?: 'desktop' | 'dsh'
+  edition?: WorkBuddyAccountEdition
   expiresAt?: number
   selected: boolean
   checkinEnabled?: boolean

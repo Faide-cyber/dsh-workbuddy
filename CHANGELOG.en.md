@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.16] - 2026-10-24
+
+### Added
+
+- Read the official account `type` field and show **Personal** / **Education** edition badges for domestic accounts.
+- Education accounts keep sign-in, account management, model catalogs, credits, and chat, while unsupported check-in/growth actions are hidden and blocked; personal check-in behavior is unchanged.
+- Encrypted desktop auth files can contribute edition identity without replacing the plugin's stored token.
+
 ## [1.0.15] - 2026-10-22
 
 ### Fixed

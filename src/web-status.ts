@@ -132,8 +132,9 @@ async function buildRegionStatus(
       id: account.id,
       ...account.nickname === undefined ? {} : { nickname: account.nickname },
       ...account.note === undefined ? {} : { note: account.note },
-       ...account.domain === undefined ? {} : { domain: account.domain },
+      ...account.domain === undefined ? {} : { domain: account.domain },
       source: account.source,
+      edition: account.edition,
       expiresAt: account.expiresAtMs,
       selected: account.selected,
       checkinEnabled: account.checkinEnabled,
@@ -145,6 +146,8 @@ async function buildRegionStatus(
     }
   })
   const selectedAccountId = options.store.selectedId()
+  const selectedAccount = accounts.find(account => account.id === selectedAccountId)
+  const checkinSupported = options.region === 'cn' && selectedAccount?.edition !== 'education'
   return {
     region: options.region,
     signedIn: accounts.length > 0,
@@ -156,8 +159,8 @@ async function buildRegionStatus(
     priceSource: 'upstream',
     ...options.probe === undefined ? {} : { probe: options.probe() },
     checkin: {
-      supported: options.region === 'cn',
-      enabled: options.region === 'cn' && autoCheckin,
+      supported: checkinSupported,
+      enabled: checkinSupported && autoCheckin,
     },
   }
 }

@@ -207,6 +207,12 @@ function modelBadgeLabel(badge: string, t: WorkBuddyPluginCardInjected['t']): st
   return badge
 }
 
+function accountEditionLabel(edition: WorkBuddyWebAccount['edition'], t: WorkBuddyPluginCardInjected['t']): string {
+  if (edition === 'education') return t('editionEducation')
+  if (edition === 'personal') return t('editionPersonal')
+  return t('editionUnknown')
+}
+
 /** One line describing where the buddy is, or that today's trip is used up. */
 function growthLabel(
   growth: { state: string; dailyLimitReached?: boolean; locationName?: string; claimedToday?: number },
@@ -784,7 +790,7 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                                    line of its own. */}
                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                                  <h4 style={sectionTitleStyle}>{t('accountsHeading')}</h4>
-                                 {signedIn && cardRegion === 'cn'
+                                 {signedIn && cardRegion === 'cn' && activeRegion?.checkin?.supported === true
                                    ? <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                        <span style={bodyStyle}>{t('autoCheckin')}</span>
                                        <Switch checked={autoCheckinEnabled} label={t('autoCheckin')} disabled={busy || controlKey === undefined} onChange={enabled => { void runControl({ action: 'setAutoCheckin', enabled }) }} />
@@ -800,6 +806,7 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                                        <span>{account.note ?? account.nickname ?? account.id}</span>
                                         {account.note !== undefined && account.nickname !== undefined ? <span style={accountMetaStyle}>{account.nickname}</span> : null}
                                        {account.selected ? <span style={chipStyle}>{t('selectedAccount')}</span> : null}
+                                        {cardRegion === 'cn' ? <span style={account.edition === 'education' ? chipStyle : mutedChipStyle}>{accountEditionLabel(account.edition, t)}</span> : null}
                                       {account.domain === undefined ? null : <span style={accountMetaStyle}>{account.domain}</span>}
                                      </span>
                                      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -852,7 +859,7 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                                               : t('connectivityFailed', { message: connectivityFeedback[`${cardRegion}:${account.id}`]!.message ?? t('requestFailed') })}
                                           {connectivityFeedback[`${cardRegion}:${account.id}`]!.checkedAt === undefined ? '' : ` · ${t('connectivityCheckedAt', { time: formatTime(connectivityFeedback[`${cardRegion}:${account.id}`]!.checkedAt) })}`}
                                         </span>}
-                                   {cardRegion === 'cn'
+                                   {cardRegion === 'cn' && account.edition !== 'education'
                                      ? <div style={accountRowStyle}>
                                          <div style={accountTextStyle}>
                                            {checkinFeedback[`${cardRegion}:${account.id}`] === undefined

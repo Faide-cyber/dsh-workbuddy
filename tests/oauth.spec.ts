@@ -56,6 +56,11 @@ describe('credentialFromPluginToken', () => {
     expect(auth.expiresAtMs).toBeLessThanOrEqual(Date.now() + 3600 * 1000)
   })
 
+  it('reads the official account type from the access-token JWT', () => {
+    const auth = credentialFromPluginToken({ accessToken: fakeJwt({ uid: 'u-edu', type: 'education' }) })
+    expect(auth.edition).toBe('education')
+  })
+
   it('defaults the overseas domain when the token omits it', () => {
     const auth = credentialFromPluginToken({
       accessToken: fakeJwt({ uid: 'u-2' }),

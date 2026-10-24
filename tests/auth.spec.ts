@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { WorkBuddyAccountStore } from '../src/auth.ts'
+import { parseWorkBuddyAuth, parseWorkBuddyAuthIdentity, WorkBuddyAccountStore } from '../src/auth.ts'
 
 const cleanup: string[] = []
 afterEach(async () => {
@@ -10,6 +10,22 @@ afterEach(async () => {
     const path = cleanup.pop()
     if (path !== undefined) await rm(path, { recursive: true, force: true })
   }
+})
+
+describe('official account edition', () => {
+  it('reads account.type and does not infer edition from enterpriseId', () => {
+    const personal = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'a' }, account: { type: 'personal' } }))
+    const education = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'b' }, account: { type: 'education' } }))
+    const legacy = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'c' }, account: { enterpriseId: 'enterprise' } }))
+    const encrypted = parseWorkBuddyAuthIdentity(JSON.stringify({
+      auth: { accessToken: { $wbEncrypted: 1, envelope: 'ciphertext' } },
+      account: { uid: 'desktop-user', type: 'personal' },
+    }))
+    expect(personal?.edition).toBe('personal')
+    expect(education?.edition).toBe('education')
+    expect(legacy?.edition).toBeUndefined()
+    expect(encrypted).toEqual({ uid: 'desktop-user', edition: 'personal' })
+  })
 })
 
 describe('WorkBuddyAccountStore', () => {
@@ -42,6 +58,48 @@ describe('WorkBuddyAccountStore', () => {
     expect((await restored.accounts()).find(account => account.id === first.id)?.note).toBe('主账号')
     await restored.setNote(first.id, ' ')
     expect((await restored.accounts()).find(account => account.id === first.id)?.note).toBeUndefined()
+  })
+
+  it('disables check-in only for education accounts', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-workbuddy-ai-auth-'))
+    cleanup.push(dir)
+    const store = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath: join(dir, 'cn-auth.json'),
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    await store.importCredential({ accessToken: 'education-token', refreshToken: '', expiresAtMs: Date.now() + 3_600_000, domain: '', uid: 'education-user', edition: 'education', source: 'dsh' })
+    await store.importCredential({ accessToken: 'personal-token', refreshToken: '', expiresAtMs: Date.now() + 3_600_000, domain: '', uid: 'personal-user', edition: 'personal', source: 'dsh' })
+    const accounts = await store.accounts()
+    expect(accounts.find(account => account.edition === 'education')).toMatchObject({ edition: 'education', checkinEnabled: false })
+    expect(await store.checkinSupported(accounts.find(account => account.edition === 'education')!.id)).toBe(false)
+    expect(await store.checkinSupported(accounts.find(account => account.edition === 'personal')!.id)).toBe(true)
+  })
+
+  it('merges the official desktop edition into an existing sidecar account', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-workbuddy-ai-auth-'))
+    cleanup.push(dir)
+    const ownPath = join(dir, 'cn-auth.json')
+    const desktopPath = join(dir, 'workbuddy-desktop.info')
+    const store = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath,
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    await store.importCredential({ accessToken: 'stored-token', refreshToken: '', expiresAtMs: Date.now() + 3_600_000, domain: '', uid: 'same-user', source: 'dsh' })
+    await writeFile(desktopPath, JSON.stringify({
+      auth: { accessToken: { $wbEncrypted: 1, envelope: 'ciphertext' }, expiresAt: 4_102_444_800 },
+      account: { uid: 'same-user', type: 'personal' },
+    }))
+    const restored = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath,
+      desktopPath,
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    const id = (await store.accounts())[0]!.id
+    expect((await restored.accounts()).find(account => account.id === id)?.edition).toBe('personal')
+    expect((await restored.resolve()).accessToken).toBe('stored-token')
   })
 
   it('returns the normalized note so the card can echo it without re-reading', async () => {
