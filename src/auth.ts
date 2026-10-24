@@ -193,7 +193,8 @@ export function normalizeAccountEdition(value: unknown): WorkBuddyAccountEdition
   if (typeof value !== 'string') return undefined
   const normalized = value.trim().toLowerCase()
   if (normalized === 'personal') return 'personal'
-  if (normalized === 'education') return 'education'
+  // The official domestic profile calls the education-benefit account "ultimate".
+  if (normalized === 'education' || normalized === 'ultimate') return 'education'
   if (normalized === 'unknown') return 'unknown'
   return undefined
 }
@@ -907,6 +908,26 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
       selected: record.id === this.selectedAccountId,
       checkinEnabled: record.checkinEnabled,
     }))
+  }
+
+  /** Fill missing editions from the upstream's official account profile once. */
+  async refreshAccountEditions(
+    fetchEdition: (credential: WorkBuddyCredential) => Promise<WorkBuddyAccountEdition | undefined>,
+  ): Promise<void> {
+    const records = await this.readAccounts()
+    let changed = false
+    for (const record of records) {
+      if (record.credential.edition !== undefined && record.credential.edition !== 'unknown') continue
+      try {
+        const edition = await fetchEdition(record.credential)
+        if (edition === undefined || edition === record.credential.edition) continue
+        record.credential = { ...record.credential, edition }
+        changed = true
+      } catch {
+        // Profile enrichment is best-effort; credits and chat remain usable.
+      }
+    }
+    if (changed) await this.persist()
   }
 
   async current(): Promise<WorkBuddyCredential | undefined> {

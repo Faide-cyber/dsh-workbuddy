@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.17] - 2026-10-24
+
+### 修复
+
+- **教育公益版不显示徽标且积分为 0**：使用官方 `/console/accounts` 的 `type=ultimate` 映射教育公益版，并改用 `/v2/billing/meter/get-enterprise-user-usage` 读取企业/教育额度；个人版额度接口保持不变。
+
 ## [1.0.16] - 2026-10-24
 
 ### 新增

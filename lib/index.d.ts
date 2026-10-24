@@ -451,6 +451,8 @@ declare class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
   private needsRefresh;
   private refreshAccount;
   accounts(): Promise<readonly WorkBuddyAccountSummary[]>;
+  /** Fill missing editions from the upstream's official account profile once. */
+  refreshAccountEditions(fetchEdition: (credential: WorkBuddyCredential) => Promise<WorkBuddyAccountEdition | undefined>): Promise<void>;
   current(): Promise<WorkBuddyCredential | undefined>;
   credentialFor(accountId: string): Promise<WorkBuddyCredential | undefined>;
   checkinSupported(accountId: string): Promise<boolean>;
@@ -712,6 +714,8 @@ declare class WorkBuddyUpstreamClient {
   fetchModels(credential: WorkBuddyCredential): Promise<readonly WorkBuddyUpstreamModel[]>;
   /** GET one catalog path and keep the `cli` agent's models only. */
   private readCatalog;
+  /** Read the official account type without inferring it from entitlements. */
+  fetchAccountEdition(credential: WorkBuddyCredential): Promise<WorkBuddyAccountEdition | undefined>;
   /** POST the billing endpoint for the aggregated remaining credit. */
   fetchCredits(credential: WorkBuddyCredential): Promise<WorkBuddyCredits>;
   /** A catalog request is a low-cost connectivity check; it never sends a chat completion. */

@@ -25,7 +25,7 @@ export type { WorkBuddyWebStatus } from './status-paths.ts'
 export interface WorkBuddyStatusRegionOptions {
   region: WorkBuddyRegion
   store: WorkBuddyAccountStore
-  client: Pick<WorkBuddyUpstreamClient, 'fetchCredits'>
+  client: Pick<WorkBuddyUpstreamClient, 'fetchCredits' | 'fetchAccountEdition'>
   catalog: WorkBuddyCatalog
   probe?: () => WorkBuddyWebProbeSection
 }
@@ -117,6 +117,9 @@ async function buildRegionStatus(
   growthStates?: ReadonlyMap<string, WorkBuddyGrowthStatus>,
   taskStates?: ReadonlyMap<string, { outstanding: number }>,
 ): Promise<WorkBuddyWebRegion> {
+  if (options.client.fetchAccountEdition !== undefined) {
+    await options.store.refreshAccountEditions(options.client.fetchAccountEdition.bind(options.client))
+  }
   const accountRows = await options.store.accounts()
   const snapshots = await options.store.refreshCreditSnapshots(
     credential => options.client.fetchCredits(credential),

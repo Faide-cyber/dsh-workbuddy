@@ -132,6 +132,29 @@ describe('isFreeCredits', () => {
 })
 
 describe('fetchCredits', () => {
+  it('uses the enterprise quota endpoint for education accounts', async () => {
+    const calls: { url: string; body?: string }[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      calls.push({ url, ...typeof init?.body === 'string' ? { body: init.body } : {} })
+      return new Response(JSON.stringify({ code: 0, data: { credit: 8.25, limitNum: 2000, cycleEndTime: '2026-10-31 23:59:59' } }), { status: 200 })
+    })
+
+    const credits = await new WorkBuddyUpstreamClient().fetchCredits({ ...credential, enterpriseId: 'enterprise' })
+    expect(calls).toEqual([{ url: 'https://www.codebuddy.cn/v2/billing/meter/get-enterprise-user-usage', body: '{}' }])
+    expect(credits.total).toBe(1991.75)
+    expect(credits.accounts[0]).toMatchObject({ packageName: 'WorkBuddy enterprise quota', remain: 1991.75, size: 2000, capacityType: 4 })
+  })
+
+  it('reads the official ultimate profile as the education edition', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      code: 0,
+      data: { accounts: [{ uid: 'test-user', type: 'ultimate' }] },
+    }), { status: 200 }))
+
+    await expect(new WorkBuddyUpstreamClient().fetchAccountEdition(credential)).resolves.toBe('education')
+  })
+
   it('uses cycle capacity only for monthly packages', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(envelope([
       { PackageName: 'monthly', CapacityType: 4, CycleCapacitySize: 350, CycleCapacityRemain: 200 },

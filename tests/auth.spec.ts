@@ -16,6 +16,7 @@ describe('official account edition', () => {
   it('reads account.type and does not infer edition from enterpriseId', () => {
     const personal = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'a' }, account: { type: 'personal' } }))
     const education = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'b' }, account: { type: 'education' } }))
+    const ultimate = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'u' }, account: { type: 'ultimate' } }))
     const legacy = parseWorkBuddyAuth(JSON.stringify({ auth: { accessToken: 'c' }, account: { enterpriseId: 'enterprise' } }))
     const encrypted = parseWorkBuddyAuthIdentity(JSON.stringify({
       auth: { accessToken: { $wbEncrypted: 1, envelope: 'ciphertext' } },
@@ -23,6 +24,7 @@ describe('official account edition', () => {
     }))
     expect(personal?.edition).toBe('personal')
     expect(education?.edition).toBe('education')
+    expect(ultimate?.edition).toBe('education')
     expect(legacy?.edition).toBeUndefined()
     expect(encrypted).toEqual({ uid: 'desktop-user', edition: 'personal' })
   })
@@ -100,6 +102,27 @@ describe('WorkBuddyAccountStore', () => {
     const id = (await store.accounts())[0]!.id
     expect((await restored.accounts()).find(account => account.id === id)?.edition).toBe('personal')
     expect((await restored.resolve()).accessToken).toBe('stored-token')
+  })
+
+  it('persists an edition filled from the official profile', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-workbuddy-ai-auth-'))
+    cleanup.push(dir)
+    const ownPath = join(dir, 'cn-auth.json')
+    const store = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath,
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    await store.importCredential({ accessToken: 'enterprise-token', refreshToken: '', expiresAtMs: Date.now() + 3_600_000, domain: '', uid: 'enterprise-user', enterpriseId: 'enterprise', source: 'dsh' })
+    await store.refreshAccountEditions(async credential => credential.enterpriseId === 'enterprise' ? 'education' : undefined)
+    const id = (await store.accounts())[0]!.id
+    expect((await store.accounts())[0]).toMatchObject({ id, edition: 'education', checkinEnabled: false })
+    const restored = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath,
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    expect((await restored.accounts())[0]?.edition).toBe('education')
   })
 
   it('returns the normalized note so the card can echo it without re-reading', async () => {

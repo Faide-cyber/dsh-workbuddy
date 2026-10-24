@@ -28,7 +28,8 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import type { WorkBuddyCredential } from './auth.ts'
+import { normalizeAccountEdition, type WorkBuddyCredential } from './auth.ts'
+import type { WorkBuddyAccountEdition } from './status-paths.ts'
 import type { ProbeAttempt } from './probe.ts'
 import { PROBE_MAX_TOKENS, PROBE_PROMPT } from './probe.ts'
 
@@ -274,6 +275,18 @@ export function parseUpstreamExpiry(value: unknown): number | undefined {
   if (matched === null) return undefined
   const [, year, month, day, hour, minute, second] = matched
   return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)) - 8 * 3_600_000
+}
+
+function numericField(record: Record<string, unknown>, ...keys: readonly string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
 }
 
 export function normalizeCredits(credits: string | undefined): string | undefined {
@@ -823,8 +836,63 @@ export class WorkBuddyUpstreamClient {
     return models
   }
 
+  /** Read the official account type without inferring it from entitlements. */
+  async fetchAccountEdition(credential: WorkBuddyCredential): Promise<WorkBuddyAccountEdition | undefined> {
+    const response = await fetch(`${billingBase(credential)}/console/accounts`, {
+      headers: { ...commonHeaders(credential), ...billingHeaders(credential) },
+      signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
+    })
+    const envelope = await readEnvelope(response)
+    if (!response.ok || envelope.code !== 0) throw envelopeError(response.status, envelope)
+    const data = typeof envelope.data === 'object' && envelope.data !== null
+      ? envelope.data as Record<string, unknown>
+      : {}
+    const rawAccounts = Array.isArray(data['accounts']) ? data['accounts'] : []
+    const enterpriseId = credential.enterpriseId?.trim() ?? ''
+    const account = rawAccounts.find(raw => {
+      if (typeof raw !== 'object' || raw === null) return false
+      const candidate = raw as Record<string, unknown>
+      if (enterpriseId !== '') return candidate['enterpriseId'] === enterpriseId || candidate['enterprise_id'] === enterpriseId
+      return candidate['uid'] === credential.uid || candidate['userId'] === credential.uid || candidate['user_id'] === credential.uid
+    })
+    if (typeof account !== 'object' || account === null) return undefined
+    const candidate = account as Record<string, unknown>
+    return normalizeAccountEdition(candidate['type'] ?? candidate['accountType'] ?? candidate['account_type'] ?? candidate['edition'])
+  }
+
   /** POST the billing endpoint for the aggregated remaining credit. */
   async fetchCredits(credential: WorkBuddyCredential): Promise<WorkBuddyCredits> {
+    if (regionOf(credential.domain) === 'cn' && credential.enterpriseId !== undefined && credential.enterpriseId !== '') {
+      const response = await fetch(`${billingBase(credential)}/v2/billing/meter/get-enterprise-user-usage`, {
+        method: 'POST',
+        headers: { ...commonHeaders(credential), ...billingHeaders(credential) },
+        body: '{}',
+        signal: AbortSignal.timeout(JSON_TIMEOUT_MS),
+      })
+      const envelope = await readEnvelope(response)
+      if (!response.ok || envelope.code !== 0) throw envelopeError(response.status, envelope)
+      const data = typeof envelope.data === 'object' && envelope.data !== null
+        ? envelope.data as Record<string, unknown>
+        : {}
+      const limit = numericField(data, 'limitNum', 'limit_num')
+      const used = numericField(data, 'credit', 'usedNum', 'used_num')
+      if (limit === undefined || used === undefined) {
+        throw new Error('workbuddy-ai enterprise quota returned no limit or usage')
+      }
+      const remain = limit < 0 ? -1 : Math.max(0, limit - used)
+      const expiresAt = parseUpstreamExpiry(data['cycleEndTime'] ?? data['cycle_end_time'])
+      return {
+        total: remain,
+        accounts: [{
+          packageName: 'WorkBuddy enterprise quota',
+          remain,
+          size: limit,
+          capacityType: 4,
+          ...expiresAt === undefined ? {} : { expiresAt },
+        }],
+      }
+    }
+
     const now = new Date()
     const format = (date: Date): string => [
       date.getFullYear().toString().padStart(4, '0'),

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.17] - 2026-10-24
+
+### Fixed
+
+- **Education accounts showed no edition badge and 0 credits**: read the official `/console/accounts` `type=ultimate` value as Education and use `/v2/billing/meter/get-enterprise-user-usage` for enterprise/education quota; the personal quota path is unchanged.
+
 ## [1.0.16] - 2026-10-24
 
 ### Added
