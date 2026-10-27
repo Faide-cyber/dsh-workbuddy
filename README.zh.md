@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-65a30d?style=flat" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/dsh-0.2.0--rc.2-4f46e5?style=flat" alt="DSH 0.2.0-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.2.x-4f46e5?style=flat" alt="DSH 0.2.x">
   <img src="https://img.shields.io/badge/providers-two-0ea5e9?style=flat" alt="two providers">
   <img src="https://img.shields.io/badge/prices-live_catalog-brightgreen?style=flat" alt="prices from the live catalog">
   <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen?style=flat" alt="zero runtime dependencies">
@@ -20,7 +20,7 @@
 - **账号**：区域隔离的多账号列表、显式切换、余额显示与预警；提供账号备注功能；显示官方**个人版 / 教育公益版**徽标；插件副本与桌面 auth 文件分离
 - **一键签到**：支持的个人账号可一键收取每日签到、猫猫旅行、成长中心全部任务（签到 / 猫猫旅行）；教育公益版标记为不支持；提供自动签到，默认关闭
 - **设备隔离**：各自的凭据、模型目录、余额相互隔离；切换账号不影响在途请求
-- **开箱即用**：安装并启用插件后，在 DSH 中直接使用，无需额外配置；现已支持 0.2.0-rc.2 桌面端
+- **开箱即用**：安装并启用插件后，在 DSH 中直接使用，无需额外配置；现已支持 0.2.x 桌面端
 
 <p align="center">
   <img src="./docs/card-accounts.png" alt="DSH WorkBuddy 设置卡片：账号与余额" width="46%">
@@ -132,8 +132,9 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | 登录成功但没有模型 | 该区域目录请求失败或返回为空——检查网络与 token 是否仍有效；此时列表保持为空，不会借用另一区域的模型 |
 | `doctor` 显示 signed-out | 先 `login`，或确认国际版桌面 App 已登录 |
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
-| 国内版每个请求都 400 `code 11128` | 国内网关会拒绝首条 system 消息以 `You are an AI agent powered by DeepSeek Harness` 开头的请求。插件转发前已把该品牌词改写为 `DSH`，无需任何设置；若你绕过插件，或上游收紧匹配条件，可在 `cordis.patch.yml` 给 `@deepseek-ai/dsh-system-prompt` 设 `includeHarnessIdentity: false` |
+| 国内版每个请求都 400 `code 11128` | 国内网关会按字面连续子串匹配 DSH 自己提示词里的原文（最初是 `You are an AI agent powered by DeepSeek Harness`，2026-10-27 起扩大到其他段落）。插件转发前会改写该横幅，并打断其余子串，无需任何设置；若你绕过插件，或上游再收紧，可在 `cordis.patch.yml` 给 `@deepseek-ai/dsh-system-prompt` 设 `includeHarnessIdentity: false` |
 | 国际版每个请求都 400 `code 11128` `request illegal` | 国际网关要求同时携带 `X-Conversation-ID`、`X-Conversation-Request-ID`、`X-Conversation-Message-ID`；插件现在会自动补齐。 |
+| DSH 升级后插件不加载 / 提示 incompatible-version | 1.0.18 起 `@deepseek-ai/dsh-*` peer 已放宽到 `^0.2.0-rc.2`；更旧的插件版本需要 `dsh plugin --profile desktop allow-version dsh-workbuddy@<版本> --dsh-version <当前版本> --accept-risk` |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

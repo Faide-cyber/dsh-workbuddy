@@ -108,6 +108,7 @@ export {
   prepareChatBody,
   regionOf,
   runGrowthTrip,
+  separateTokenBoundaries,
   WorkBuddyUpstreamClient,
   type UpstreamErrorKind,
   type WorkBuddyChatResult,
@@ -252,10 +253,11 @@ export function apply(ctx: Context, config: Config): void {
   const cnCatalog = new WorkBuddyCatalog({
     scope: current().cnModelScope ?? current().modelScope ?? 'free',
   })
-  // Seeded from the card's own file, not just the composed config. A host whose
-  // settings service has no `register()` never runs the inject callback below,
-  // and nothing else would apply the file before the picker first asks: the
-  // scope would sit at the composed default and the card would look reset.
+  // Seeded from the card's own file, not just the composed config. The settings
+  // service is a read-through at best (dsh 0.2.1 dropped the `register()` API this
+  // once used), and nothing else would apply the file before the picker first
+  // asks: the scope would sit at the composed default and the card would look
+  // reset.
   store.setDesktopPath(current().authFile)
   cnStore.setDesktopPath(current().cnAuthFile)
   catalog.setDisabled(current().disabledModels ?? [])
@@ -830,57 +832,12 @@ export function apply(ctx: Context, config: Config): void {
     }, controlKey)
   })
 
-  // The settings section is what makes the provider visible on the Models
-  // settings page (settings.describe joins the provider directory). It is a
-  // read-through only: registration never completed in this profile, so card
-  // edits are persisted by `settings-file.ts` instead. `saved` wins over the
-  // section's value because a card edit is newer than the composed config.
-  ctx.inject(['settings'], settingsCtx => {
-    // The section is what makes the provider visible on the Models settings
-    // page (settings.describe joins the provider directory). A host whose
-    // settings service predates `register()` — dsh 0.1.7 derives namespaces
-    // from a plugin Config schema instead — throws a TypeError here that
-    // cordis swallows, so the guard keeps that from looking like a plugin
-    // failure. The card's own file is the write path either way.
-    const settings = settingsCtx.settings as typeof settingsCtx.settings & {
-      register?: (ns: string, schema: unknown, options: { base: Config }) => {
-        get: () => Config
-        watch: (callback: () => void) => () => void
-      }
-    }
-    if (typeof settings.register !== 'function') {
-      ctx.logger.info('dsh-workbuddy: settings service has no register(); the card persists to its own file')
-      return
-    }
-    const scope = settings.register(WORKBUDDY_SETTINGS_NS, Config, { base: config })
-    base = () => scope.get()
-    const apply = (): void => {
-      const next = current()
-      store.setDesktopPath(next.authFile)
-      cnStore.setDesktopPath(next.cnAuthFile)
-      catalog.setScope(next.modelScope ?? 'free')
-      cnCatalog.setScope(next.cnModelScope ?? next.modelScope ?? 'free')
-      catalog.setDisabled(next.disabledModels ?? [])
-      cnCatalog.setDisabled(next.cnDisabledModels ?? [])
-      refreshModels()
-      void refreshCredits()
-      void refreshCheckinStates()
-      void runAutoCheckin()
-    }
-    apply()
-    // A committed settings value supersedes the stored file, so an edit made in
-    // the DSH settings page is what the card shows rather than a stale layer.
-    ctx.effect(() => scope.watch(() => {
-      // The section only fills in what the card has never written. `scope.get()`
-      // always returns every schema field, defaults included, so merging it whole
-      // would push `cnModelScope: 'free'` and an empty disabled list over a
-      // file-backed selection and the next card edit would persist that reset.
-      const fromSection = sanitizeSavedConfig(scope.get() as Record<string, unknown>)
-      const filled = saved as Record<string, unknown>
-      for (const [key, value] of Object.entries(fromSection)) if (!(key in filled)) filled[key] = value
-      apply()
-    }), 'dsh-workbuddy: settings observer')
-  })
+  // Settings needs no call from here on either side of the 0.2.1 break: dsh-settings
+  // >= 0.2.1 derives every editable field from the entry's own `Config` schema,
+  // which this plugin exports, and its predecessor's `register()` never completed
+  // in this profile anyway. Card edits go through `settings-file.ts`, and nothing
+  // here waits on the settings service, so the plugin loads on hosts that have it
+  // and on hosts that do not.
 
   let stopped = false
   const backgroundTimer = setInterval(() => {

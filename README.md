@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-65a30d?style=flat" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/dsh-0.2.0--rc.2-4f46e5?style=flat" alt="DSH 0.2.0-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.2.x-4f46e5?style=flat" alt="DSH 0.2.x">
   <img src="https://img.shields.io/badge/providers-two-0ea5e9?style=flat" alt="two providers">
   <img src="https://img.shields.io/badge/prices-live_catalog-brightgreen?style=flat" alt="prices from the live catalog">
   <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen?style=flat" alt="zero runtime dependencies">
@@ -20,7 +20,7 @@
 - **Accounts**: region-isolated multi-account list, explicit switching, credit display and warnings; accounts can be given their own names; official **Personal** / **Education** edition badges are shown; the plugin's copies are kept apart from the desktop auth files
 - **One-click check-in**: daily check-in, the cat's growth trip and every growth-center task (签到 / 猫猫旅行) collected in a single action for supported personal accounts; education accounts are marked as unsupported; auto check-in is available and off by default
 - **Device isolation**: each account's credential, its model catalog and its credit balance stand apart; switching accounts never touches in-flight requests
-- **Works out of the box**: install it, enable it, and use it from DSH — no extra configuration; DSH 0.2.0-rc.2 desktop is supported today
+- **Works out of the box**: install it, enable it, and use it from DSH — no extra configuration; DSH 0.2.x desktop is supported today
 
 <p align="center">
   <img src="./docs/card-accounts.png" alt="DSH WorkBuddy settings card: accounts and credits" width="46%">
@@ -132,8 +132,9 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | Signed in but no models | The region's catalog request failed or returned nothing — check connectivity and whether the token is still valid; the list stays empty rather than borrowing the other region's models |
 | `doctor` says signed-out | Run `login` first, or confirm the international desktop app is signed in |
 | Want paid models | Switch the scope to "All models" on the settings card — credits will be burned |
-| 400 code 11128 on every request (domestic region) | The domestic gateway rejects a leading system message that starts with `You are an AI agent powered by DeepSeek Harness`. The plugin renames that brand word to `DSH` in the forwarded body, so no setup is needed; if you bypass the plugin or the gateway widens its match, set `includeHarnessIdentity: false` on `@deepseek-ai/dsh-system-prompt` in `cordis.patch.yml` instead. |
+| 400 code 11128 on every request (domestic region) | The domestic gateway matches literal character runs taken from DSH's own prompt text — originally `You are an AI agent powered by DeepSeek Harness`, and since 2026-10-27 other paragraphs too. The plugin renames that banner and breaks the remaining runs before forwarding, so no setup is needed; if you bypass the plugin or the gateway narrows further, set `includeHarnessIdentity: false` on `@deepseek-ai/dsh-system-prompt` in `cordis.patch.yml` instead. |
 | 400 code 11128 `request illegal` on every request (international region) | The international gateway requires `X-Conversation-ID`, `X-Conversation-Request-ID`, and `X-Conversation-Message-ID`; the plugin now supplies them automatically. |
+| Plugin does not load after a DSH upgrade / `incompatible-version` | Peer ranges for `@deepseek-ai/dsh-*` are `^0.2.0-rc.2` since 1.0.18. An older plugin version needs `dsh plugin --profile desktop allow-version dsh-workbuddy@<version> --dsh-version <running version> --accept-risk`. |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

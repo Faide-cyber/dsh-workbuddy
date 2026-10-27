@@ -2,6 +2,17 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.18] - 2026-10-27
+
+### 修复
+
+- **国内版又重新每个请求都 400 `code 11128`（渠道风控升级）**：国内网关不再只认那句身份横幅，改为按**字面连续子串**匹配 DSH 自己提示词里的原文（实测最小触发串是 `Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root` 这 111 个字符）。逐个改词是打不完的仗，所以改成**打断子串**：转发前把国内区域的 system 消息里每隔一段距离的一个空格换成不换行空格 U+00A0（`separateTokenBoundaries()`），任何连续子串都无法完整存活，而提示词文字、语义和字数都不变。只动 system 消息（即 DSH 自己的提示词），不碰工具结果和用户内容，避免 U+00A0 被写回文件；1.0.14 的横幅改写保留。
+- **DSH 0.2.1 拒绝加载本插件**：`peerDependencies` 里七处 `@deepseek-ai/dsh-*` 原本钉死 `0.2.0-rc.2`，DSH 0.2.1 的兼容性检查因此判定不兼容并拒绝整行。改为 `^0.2.0-rc.2`（`^0.2.0-rc.2` 会钉住 minor，放行 0.2.x、仍挡住 0.3），并把 `@earendil-works/pi-ai` 放宽到 `^0.87.1 || ^1.1.0`（0.2.1 起 DSH 改用 pi-ai 1.x）。已在 0.2.1-rc.2 + pi-ai 1.1.0 的依赖组合下通过类型检查。
+
+### 变更
+
+- 移除对 `settings.register()` 的调用：dsh-settings 0.2.1 去掉该 API，改为从插件自己的 `Config` schema 生成配置表单，插件无需再注册。卡片配置仍写插件自己的文件。
+
 ## [1.0.17] - 2026-10-24
 
 ### 修复

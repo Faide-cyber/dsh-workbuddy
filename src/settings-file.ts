@@ -1,12 +1,12 @@
 /**
  * Card-edited configuration, kept in the plugin's own file under `$DSH_HOME`.
  *
- * The DSH settings service is the natural home for this, and the plugin still
- * registers with it (that is what puts the provider on the Models settings
- * page), but it is not a reliable *write* path here: registration never
- * completed in this profile, so every card edit was lost on restart. A switch
- * that does not stick is worse than one that says it is temporary, so the edits
- * live in a file this plugin owns end to end.
+ * The DSH settings service is the natural home for this, and on dsh >= 0.2.1 the
+ * plugin *does* appear there (the service derives every form from the entry's own
+ * `Config` schema, which this plugin exports), but it is not a reliable *write*
+ * path here: registration never completed in this profile, so every card edit was
+ * lost on restart. A switch that does not stick is worse than one that says it is
+ * temporary, so the edits live in a file this plugin owns end to end.
  *
  * The file sits beside the plugin's credential copy, carries no token or
  * prompt, and is read back through {@link sanitizeSavedConfig}: a file on disk

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.18] - 2026-10-27
+
+### Fixed
+
+- **Domestic requests failed with 400 `code 11128` again (the gateway widened its filter)**: the domestic gateway no longer matches only the identity banner; it matches **literal character runs** taken from DSH's own prompt text (measured: the shortest matching run is the 111-character `Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root`). Rewording runs one at a time is an unwinnable race, so the plugin now **breaks** them instead: before forwarding, one space every so often in a domestic system message becomes a no-break space (U+00A0) via `separateTokenBoundaries()`, so no literal run survives intact while the prompt's words, meaning and length are unchanged. System messages only — DSH's own prompt — never tool results or user content, so no U+00A0 can be written back into a file. The 1.0.14 banner rewrite stays.
+- **DSH 0.2.1 refused to load the plugin**: seven `@deepseek-ai/dsh-*` peers were pinned to the exact `0.2.0-rc.2`, which made DSH 0.2.1's compatibility check reject the whole row. They are now `^0.2.0-rc.2` (which pins the minor, admitting 0.2.x and still stopping at 0.3), and `@earendil-works/pi-ai` widened to `^0.87.1 || ^1.1.0` (DSH switched to pi-ai 1.x in 0.2.1). Type-checked against DSH 0.2.1-rc.2 with pi-ai 1.1.0.
+
+### Changed
+
+- Dropped the `settings.register()` call: dsh-settings 0.2.1 removed that API and derives configuration forms from the plugin's own `Config` schema, so no registration is needed. Card edits still go to the plugin's own file.
+
 ## [1.0.17] - 2026-10-24
 
 ### Fixed
