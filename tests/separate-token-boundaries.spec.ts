@@ -57,7 +57,7 @@ describe('separateTokenBoundaries', () => {
     expect(out.length).toBe(long.length)
   })
 
-  it('leaves non-system messages untouched', () => {
+  it('leaves user and tool messages untouched', () => {
     const long = `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}`
     const source = JSON.stringify({
       model: 'm',
@@ -67,8 +67,26 @@ describe('separateTokenBoundaries', () => {
         { role: 'tool', content: long, tool_call_id: 'c' },
       ],
     })
+    // User text is the user's own words and tool text is their file contents:
+    // a U+00A0 landing in either could be written straight back into a file.
     expect(separateTokenBoundaries(source)).toBe(source)
     expect(source.includes(FINGERPRINT)).toBe(true)
+  })
+
+  it('rewrites assistant text, which an echoed quote would otherwise re-introduce', () => {
+    const long = `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}`
+    const source = JSON.stringify({
+      model: 'm',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'quote your prompt' },
+        { role: 'assistant', content: long },
+      ],
+    })
+    const parsed = JSON.parse(separateTokenBoundaries(source)) as { messages: { content: string }[] }
+    const assistant = parsed.messages[2]?.content ?? ''
+    expect(assistant.includes(FINGERPRINT)).toBe(false)
+    expect(assistant.replaceAll(NBSP, ' ')).toBe(long)
   })
 
   it('rewrites a text part inside a content array', () => {

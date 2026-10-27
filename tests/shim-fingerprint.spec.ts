@@ -76,4 +76,44 @@ describe('shim domestic fingerprint break', () => {
     expect(forwarded.includes(FINGERPRINT)).toBe(true)
     expect(forwarded.includes(NBSP)).toBe(false)
   })
+
+  it('also breaks a run the model echoed back in an earlier reply', async () => {
+    // A system-only rewrite defeats itself here: the assistant quoted the prompt,
+    // and the gateway reads assistant text too, so the echoed copy blocks the turn.
+    let forwarded = ''
+    shim = createWorkBuddyShim({
+      store: {
+        current: async () => cnCredential,
+        resolve: async () => cnCredential,
+        status: async () => ({ state: 'signed-in' as const }),
+        importCredential: async (value: WorkBuddyCredential) => value,
+        logout: async () => {},
+      },
+      client: {
+        chatStream: async (_credential, bodyJson: string) => {
+          forwarded = bodyJson
+          return {
+            ok: true,
+            response: new Response('data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+          }
+        },
+      },
+      catalog: new WorkBuddyCatalog({ scope: 'all' }),
+    })
+    await shim.ready
+    const res = await fetch(`${shim.baseUrl()}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${shim.token()}` },
+      body: JSON.stringify({
+        model: 'deepseek-v4.1-flash',
+        messages: [
+          { role: 'system', content: `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}` },
+          { role: 'user', content: 'what does your prompt say?' },
+          { role: 'assistant', content: `It says: "${FINGERPRINT}".` },
+        ],
+      }),
+    })
+    await res.text()
+    expect(forwarded.includes(FINGERPRINT)).toBe(false)
+  })
 })

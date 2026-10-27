@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.19] - 2026-10-28
+
+### Fixed
+
+- **1.0.18's fingerprint break had a gap: as soon as the model quotes DSH's own prompt in a reply, the next turn fails with `400 code 11128` again.** Measured, the gateway scans `system`, `developer` and `assistant` text and does **not** scan `user` or `tool`; 1.0.18 rewrote only `system`, so the ordinary case of an assistant echoing the prompt re-introduced an intact run — with the system prompt itself already clean, the request was still refused. Assistant content is broken now too; `user` and `tool` stay untouched, because those hold the user's own words and file contents and a no-break space there could be written back into a file.
+
 ## [1.0.18] - 2026-10-27
 
 ### Fixed
