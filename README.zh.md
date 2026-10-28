@@ -134,7 +134,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
 | 国内版每个请求都 400 `code 11128` | 国内网关会按字面连续子串匹配 DSH 自己提示词里的原文（最初是 `You are an AI agent powered by DeepSeek Harness`，2026-10-27 起扩大到其他段落）。插件转发前会改写该横幅，并打断 system 与 assistant 消息里的其余子串（网关扫这两类，不扫 user/tool），无需任何设置；若你绕过插件，或上游再收紧，可在 `cordis.patch.yml` 给 `@deepseek-ai/dsh-system-prompt` 设 `includeHarnessIdentity: false` |
 | 国际版每个请求都 400 `code 11128` `request illegal` | 国际网关要求同时携带 `X-Conversation-ID`、`X-Conversation-Request-ID`、`X-Conversation-Message-ID`；插件现在会自动补齐。 |
-| DSH 升级后插件不加载 / 提示 incompatible-version | 1.0.18 起 `@deepseek-ai/dsh-*` peer 已放宽到 `^0.2.0-rc.2`；更旧的插件版本需要 `dsh plugin --profile desktop allow-version dsh-workbuddy@<版本> --dsh-version <当前版本> --accept-risk` |
+| DSH 升级后插件不加载 / 提示 incompatible-version | 声明支持 DSH `>=0.2.0-rc.2 <0.2.1-0 \|\| >=0.2.1-rc.1 <0.3.0-0`（1.0.20 起写在 `engines.dsh`）；更旧的插件版本需要 `dsh plugin --profile desktop allow-version dsh-workbuddy@<版本> --dsh-version <当前版本> --accept-risk` |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor

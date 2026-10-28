@@ -134,7 +134,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | Want paid models | Switch the scope to "All models" on the settings card — credits will be burned |
 | 400 code 11128 on every request (domestic region) | The domestic gateway matches literal character runs taken from DSH's own prompt text — originally `You are an AI agent powered by DeepSeek Harness`, and since 2026-10-27 other paragraphs too. The plugin renames that banner and breaks the remaining runs in `system` and `assistant` messages (the roles the gateway scans; `user` and `tool` are not scanned), so no setup is needed; if you bypass the plugin or the gateway narrows further, set `includeHarnessIdentity: false` on `@deepseek-ai/dsh-system-prompt` in `cordis.patch.yml` instead. |
 | 400 code 11128 `request illegal` on every request (international region) | The international gateway requires `X-Conversation-ID`, `X-Conversation-Request-ID`, and `X-Conversation-Message-ID`; the plugin now supplies them automatically. |
-| Plugin does not load after a DSH upgrade / `incompatible-version` | Peer ranges for `@deepseek-ai/dsh-*` are `^0.2.0-rc.2` since 1.0.18. An older plugin version needs `dsh plugin --profile desktop allow-version dsh-workbuddy@<version> --dsh-version <running version> --accept-risk`. |
+| Plugin does not load after a DSH upgrade / `incompatible-version` | Declared support is DSH `>=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-rc.1 <0.3.0-0` (in `engines.dsh` since 1.0.20). An older plugin version needs `dsh plugin --profile desktop allow-version dsh-workbuddy@<version> --dsh-version <running version> --accept-risk`. |
 
 ```sh
 dsh plugin --profile web exec dsh-workbuddy doctor
