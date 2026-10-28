@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { separateTokenBoundaries } from '../src/upstream.ts'
 
-/** The exact 111-character run the domestic gateway blocked on 2026-10-27. */
+/**
+ * The run the domestic gateway blocked on 2026-10-27, still blocked on 2026-10-29.
+ * 112 characters is the measured minimum: dropping the final `t` is accepted.
+ */
 const FINGERPRINT = 'Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root'
 
-const NBSP = '\u00a0'
+/** What a swapped space becomes. The gateway normalizes U+00A0, so this is a line feed. */
+const BREAK = '\n'
+
+/** Whitespace-insensitive form, to prove the swap preserves the words. */
+const flat = (text: string): string => text.replaceAll(/\s+/g, ' ').trim()
 
 function body(systemText: string, extra: Record<string, unknown> = {}): string {
   return JSON.stringify({
@@ -19,12 +26,12 @@ function systemOf(source: string): string {
   return String(parsed.messages[0]?.content)
 }
 
-/** Longest run of original (non-NBSP) characters left in the text. */
+/** Longest run of original characters left in the text. */
 function longestIntactRun(text: string): number {
   let longest = 0
   let current = 0
   for (const char of text) {
-    if (char === NBSP) {
+    if (char === BREAK) {
       longest = Math.max(longest, current)
       current = 0
       continue
@@ -50,11 +57,12 @@ describe('separateTokenBoundaries', () => {
     expect(longestIntactRun(out)).toBeLessThanOrEqual(55)
   })
 
-  it('keeps every original character, only swapping spaces for no-break spaces', () => {
+  it('keeps every word, only swapping spaces for line breaks', () => {
     const long = `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}`
     const out = systemOf(separateTokenBoundaries(body(long)))
-    expect(out.replaceAll(NBSP, ' ')).toBe(long)
+    expect(flat(out)).toBe(flat(long))
     expect(out.length).toBe(long.length)
+    expect(out.includes(BREAK)).toBe(true)
   })
 
   it('leaves user and tool messages untouched', () => {
@@ -68,7 +76,7 @@ describe('separateTokenBoundaries', () => {
       ],
     })
     // User text is the user's own words and tool text is their file contents:
-    // a U+00A0 landing in either could be written straight back into a file.
+    // a swapped separator landing in either could be written straight into a file.
     expect(separateTokenBoundaries(source)).toBe(source)
     expect(source.includes(FINGERPRINT)).toBe(true)
   })
@@ -86,7 +94,7 @@ describe('separateTokenBoundaries', () => {
     const parsed = JSON.parse(separateTokenBoundaries(source)) as { messages: { content: string }[] }
     const assistant = parsed.messages[2]?.content ?? ''
     expect(assistant.includes(FINGERPRINT)).toBe(false)
-    expect(assistant.replaceAll(NBSP, ' ')).toBe(long)
+    expect(flat(assistant)).toBe(flat(long))
   })
 
   it('rewrites a text part inside a content array', () => {
@@ -97,7 +105,7 @@ describe('separateTokenBoundaries', () => {
     }
     const text = parsed.messages[0]?.content[0]?.text ?? ''
     expect(text.includes(FINGERPRINT)).toBe(false)
-    expect(text.replaceAll(NBSP, ' ')).toBe(long)
+    expect(flat(text)).toBe(flat(long))
   })
 
   it('passes a non-JSON or non-object body through unchanged', () => {

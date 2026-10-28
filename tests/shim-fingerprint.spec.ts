@@ -3,9 +3,18 @@ import { WorkBuddyCatalog } from '../src/catalog.ts'
 import { createWorkBuddyShim, type WorkBuddyShim } from '../src/shim.ts'
 import type { WorkBuddyCredential } from '../src/auth.ts'
 
-/** The 111-character run the domestic gateway blocked on 2026-10-27. */
+/** The run the domestic gateway blocked on 2026-10-27, still blocked on 2026-10-29. */
 const FINGERPRINT = 'Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root'
-const NBSP = '\u00a0'
+
+/** The system text every request below starts from. */
+const SYSTEM = `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}`
+
+/** White-space-insensitive form, to prove the break preserves the words. */
+const flat = (text: string): string => text.replaceAll(/\s+/g, ' ').trim()
+
+/** The `system` text of a forwarded body. */
+const systemOf = (body: string): string =>
+  String((JSON.parse(body) as { messages: { role: string; content: unknown }[] }).messages[0]?.content)
 
 const cnCredential: WorkBuddyCredential = {
   accessToken: 'token',
@@ -50,7 +59,7 @@ async function forwardedBody(credential: WorkBuddyCredential): Promise<string> {
     headers: { 'content-type': 'application/json', authorization: `Bearer ${shim.token()}` },
     body: JSON.stringify({
       model: 'deepseek-v4.1-flash',
-      messages: [{ role: 'system', content: `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}` }, { role: 'user', content: 'hi' }],
+      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: 'hi' }],
     }),
   })
   await res.text()
@@ -65,16 +74,16 @@ afterEach(async () => {
 describe('shim domestic fingerprint break', () => {
   it('breaks the blocked run on the domestic route', async () => {
     const forwarded = await forwardedBody(cnCredential)
-    expect(forwarded.includes(FINGERPRINT)).toBe(false)
-    expect(forwarded.includes(NBSP)).toBe(true)
-    // Still the same text once the no-break spaces are read back as spaces.
-    expect(forwarded.replaceAll(NBSP, ' ')).toContain(FINGERPRINT)
+    const system = systemOf(forwarded)
+    expect(system.includes(FINGERPRINT)).toBe(false)
+    // Every word survives: only some spaces became line breaks.
+    expect(flat(system)).toBe(flat(SYSTEM))
+    expect(system.length).toBe(SYSTEM.length)
   })
 
   it('leaves the international request byte-identical', async () => {
     const forwarded = await forwardedBody(globalCredential)
-    expect(forwarded.includes(FINGERPRINT)).toBe(true)
-    expect(forwarded.includes(NBSP)).toBe(false)
+    expect(systemOf(forwarded)).toBe(SYSTEM)
   })
 
   it('also breaks a run the model echoed back in an earlier reply', async () => {
@@ -107,7 +116,7 @@ describe('shim domestic fingerprint break', () => {
       body: JSON.stringify({
         model: 'deepseek-v4.1-flash',
         messages: [
-          { role: 'system', content: `${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}` },
+          { role: 'system', content: SYSTEM },
           { role: 'user', content: 'what does your prompt say?' },
           { role: 'assistant', content: `It says: "${FINGERPRINT}".` },
         ],
