@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.20] - 2026-10-28
+
+### Changed
+
+- **Peer ranges now use explicit `||` branches, and `engines.dsh` was added.** The seven `@deepseek-ai/dsh-*` peers were spelled `^0.2.0-rc.2`: node-semver admits a prerelease version only when some comparator in the range shares its exact `major.minor.patch` tuple *and* carries its own prerelease tag, and that caret's tag sits on `0.2.0` — it never reaches `0.2.1-rc.3`. DSH's own loader passes `includePrerelease` and so admitted it (confirmed on a real 0.2.1-rc.3 host), but **plain `npm install`/pnpm resolves with ordinary semver and raised `ERESOLVE`**. They are now `>=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-rc.1 <0.3.0-0`, measured to give identical verdicts in both modes while still stopping at the 0.3 line.
+- `package.json` gained `engines.dsh`, spelled **identically** to those peer ranges — the plugin market's compatibility badge reads this field (it reads an npm manifest, not the repository), so two spellings of one contract would drift; a test asserts they are equal.
+
 ## [1.0.19] - 2026-10-28
 
 ### Fixed

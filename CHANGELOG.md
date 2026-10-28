@@ -2,6 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.20] - 2026-10-28
+
+### 变更
+
+- **peer 范围改成显式 `||` 分支，并补上 `engines.dsh`**。此前七处 `@deepseek-ai/dsh-*` 写的是 `^0.2.0-rc.2`：node-semver 只在「范围里某个比较符与该版本 `major.minor.patch` 元组一致、且自身带预发布标签」时才让预发布版本满足范围，而 `^0.2.0-rc.2` 的标签挂在 `0.2.0` 上，够不到 `0.2.1-rc.3`。DSH 自己的闸门用 `includePrerelease` 所以能过（真机 0.2.1-rc.3 已证实），但 **npm/pnpm 安装走普通 semver，会报 `ERESOLVE`**。现在统一写成 `>=0.2.0-rc.2 <0.2.1-0 || >=0.2.1-rc.1 <0.3.0-0`，实测两种模式判定完全一致，且仍然挡住 0.3 线。
+- `package.json` 新增 `engines.dsh`，与上述 peer 范围**逐字相同**——插件市场左下角的兼容性角标读的就是这个字段（它读 npm 包的 manifest，不读仓库），两处不同写法会漂移，故用测试断言二者相等。
+
 ## [1.0.19] - 2026-10-28
 
 ### 修复
