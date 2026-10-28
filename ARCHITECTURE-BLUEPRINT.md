@@ -308,15 +308,17 @@ growthHeaders(c)      // upstream.ts:929  Authorization: Bearer ...  X-Codebuddy
 ### 3.4 请求体改写 `prepareChatBody`
 
 ```ts
-export function prepareChatBody(source: string): string   // upstream.ts:448
+export function prepareChatBody(source: string, fixedEffort?: string): string   // upstream.ts:506
 ```
 
-非 JSON 原样返回；否则四处改写（每处都对应一次实测拒绝）：
+非 JSON 原样返回；否则五处改写 + 一处条件注入（每处都对应一次实测拒绝）：
 
 1. `stream = true` 强制（上游拒绝非流式）。
-2. `normalizeDeveloperRole` (upstream.ts:465)：`role:'developer'` → `'system'`（pi-ai 用 developer 角色发系统提示，上游回 400 code 11128）。
-3. `normalizeToolChoice` (upstream.ts:493)：对象形式拍平成字符串；`none` 删 `tool_choice` 连同 `tools`/`functions`；`{type:'function',function:{name}}` → 裸 name。
-4. `ensureLeadingSystemMessage` (upstream.ts:481)：首条不是 system 就 `unshift({role:'system',content:'You are a helpful assistant.'})`（上游规定首条必须是 system，否则 11128）。
+2. `normalizeDeveloperRole` (upstream.ts:527)：`role:'developer'` → `'system'`（pi-ai 用 developer 角色发系统提示，上游回 400 code 11128）。
+3. `normalizeToolChoice` (upstream.ts:744)：对象形式拍平成字符串；`none` 删 `tool_choice` 连同 `tools`/`functions`；`{type:'function',function:{name}}` → 裸 name。
+4. `ensureLeadingSystemMessage` (upstream.ts:543)：首条不是 system 就 `unshift({role:'system',content:'You are a helpful assistant.'})`（上游规定首条必须是 system，否则 11128）。
+5. `rewriteFingerprints` (upstream.ts:568)：逐条把 `system`/`assistant` 正文里已登记的字面串改写成同义句，表在 `src/fingerprints.ts`（每条带实测日期与证据；无命中时逐字节不变，护前缀缓存）。2026-10-29 起取代只认句首的 `rewriteHarnessBanner`——后者对现在的首段 `You are a coding agent powered by …` 已不命中。
+6. 条件注入 `reasoning_effort = fixedEffort`（仅当行声明 `onlyReasoning` 且 body 无该字段）。
 
 ### 3.5 响应包封与错误分类
 

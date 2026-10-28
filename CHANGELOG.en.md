@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.22] - 2026-10-29
+
+### Fixed
+
+- **Domestic requests failed with `400 code 11128` again: the no-break spaces added in 1.0.18/1.0.19 were being silently eaten by the gateway.** Against the same 112-character minimal trigger run, four variants: as-is 400; space swapped to U+00A0 (what shipped) **still 400**; swapped to U+200B **400**; swapped to `\n` **200**, to `\t` **200**. The gateway evidently normalizes whitespace before matching (NBSP becomes a space, ZWSP is stripped), so an invisible-whitespace defence is guaranteed to be zeroed by the next round. The break character is now a real line feed: `BOUNDARY_BREAK = '\n'`.
+- **Chinese prose was not covered at all.** The separator only acted on `char === ' '`, and a real domestic system prompt (9414 characters) holds 2275 Han characters but only 1071 spaces — 144 usable swap points, so Chinese sentences went through untouched, which is exactly the kind of text the gateway matches. Breaks are now **inserted** at Unicode wide-character stretches (CJK, kana, Hangul, full-width): the trigger is "previous character wide, current character wide and not leading punctuation", so no line ever starts with `，` or `。`; inserted rather than replaced, so not one character changes.
+- **New semantic layer, `src/fingerprints.ts` (table-driven narrow rewrites), immune to whitespace normalization.** It rewrites words, not whitespace, so normalizing whitespace cannot defeat it. It replaces and deletes `rewriteHarnessBanner` / `HARNESS_BANNER`: that regex anchored the start of the first message on `You are an AI agent powered by DeepSeek Harness`, and the current DSH prompt starts with `You are a coding agent powered by the deepseek-v4.1-flash model.` — **a dead regex on current versions**. Two rows now: `DeepSeek Harness` → `DSH` (any position, case-insensitive), and the 112-character `@`-reference run → an equivalent. Each row carries its measurement date and evidence (borrowed from the same-gateway precedent in dsh-providers-hub: no evidence, no row), with tests asserting a dated note exists and that no rewritten text still contains a registered run.
+- **Outbound entry-point audit**: `/v2/chat/completions` appears exactly twice in the repo — `chatStream` (all real traffic, full pipeline) and `probeEffort` (body hard-codes `PROBE_PROMPT`, safe by construction). The latter gained a documented gate: anyone adding caller text to that body inherits the fingerprint obligation and must keep the body fixed.
+
+### Changed
+
+- The semantic layer is active in **both regions** (the rewordings are meaning-neutral, so the international region is not harmed); the structural layer (line-feed breaking) stays domestic-only, with the region derived from the credential domain rather than hard-coded.
+- Byte-identical when nothing matches (a `toLowerCase().includes` pre-check first), so the upstream prefix cache survives; the separator is an idempotent fixed point (running it twice changes nothing).
+- Known ceiling, stated plainly: space-free long ASCII runs (URLs, base64, `a/b/c`-style paths) cannot be broken — the longest surviving stretch in a real system prompt is 67 characters — and the break layer is domestic-only.
+- Offline acceptance on a real domestic system prompt (9414 characters, through the built artifact): 0/0 registered runs left, same characters in order ignoring whitespace, no line starting with Chinese punctuation, fixed point, longest stretch 1304 → 67, length 9414 → 9432 (+0.19%). 19 test files / 163 tests green.
+
 ## [1.0.21] - 2026-10-28
 
 ### Fixed

@@ -671,7 +671,7 @@ const WIDE_CHAR = /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\ufe30-\
  * like a broken prompt. Skipping these moves the break past the punctuation, where
  * a line end is ordinary typography.
  */
-const WIDE_LEAD_IN = /[、。，؛；：！？…—）」』】》〉｝〕］]/
+const WIDE_LEAD_IN = /[、。，；：！？…—）」』】》〉｝〕］]/
 
 function separateContentBoundaries(content: unknown): unknown {
   if (typeof content === 'string') return separateString(content)
@@ -693,8 +693,9 @@ function separateContentBoundaries(content: unknown): unknown {
  *   becomes the break), so prose pays one break per ~40 characters however dense
  *   its spaces are.
  * - A stretch of {@link WIDE_CHAR} characters has no space to take: a break is
- *   **inserted** before the next such character. Inserting rather than replacing is
- *   what gives the same guarantee — no stretch longer than the limit survives.
+ *   **inserted** between two of them, never in front of {@link WIDE_LEAD_IN}
+ *   punctuation. Inserting rather than replacing is what gives the same guarantee —
+ *   no stretch longer than the limit survives.
  *
  * A message shorter than the limit is returned byte-identical, and the output is a
  * fixed point: the break always lands on the **first** opportunity past the limit,
@@ -707,11 +708,13 @@ function separateContentBoundaries(content: unknown): unknown {
 function separateString(text: string): string {
   if (text.length <= MAX_RUN_CHARS) return text
   let sinceBreak = 0
+  let previousWide = false
   let out = ''
   for (const char of text) {
     if (char === ' ' && sinceBreak >= MAX_RUN_CHARS) {
       out += BOUNDARY_BREAK
       sinceBreak = 0
+      previousWide = false
       continue
     }
     // A newline (or any other whitespace) already splits the text, so the distance
@@ -719,15 +722,18 @@ function separateString(text: string): string {
     // before a break and get broken twice.
     if (char !== ' ' && WHITESPACE.test(char)) {
       sinceBreak = 0
+      previousWide = false
       out += char
       continue
     }
-    if (sinceBreak >= MAX_RUN_CHARS && WIDE_CHAR.test(char)) {
+    if (sinceBreak >= MAX_RUN_CHARS && previousWide && WIDE_CHAR.test(char) && !WIDE_LEAD_IN.test(char)) {
       out += BOUNDARY_BREAK
       sinceBreak = 0
+      previousWide = false
     }
     sinceBreak++
     out += char
+    previousWide = WIDE_CHAR.test(char)
   }
   return out
 }

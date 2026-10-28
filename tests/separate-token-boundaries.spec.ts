@@ -132,6 +132,17 @@ describe('separateTokenBoundaries', () => {
     expect(out.replaceAll(BREAK, '')).toBe(CJK)
   })
 
+  it('never starts a line with Chinese punctuation', () => {
+    // The break goes before the character that starts the next stretch; skipping
+    // punctuation puts it *after* the comma instead, where a line end reads normally.
+    const sentence = '这是一句很长的中文，'.repeat(10)
+    const out = systemOf(separateTokenBoundaries(body(sentence)))
+    expect(out.includes(BREAK)).toBe(true)
+    for (const char of '、。，；：！？…）」』】》〉') {
+      expect(out.includes(BREAK + char)).toBe(false)
+    }
+  })
+
   it('never breaks inside a space-free ASCII token', () => {
     const url = `https://example.com/${'a'.repeat(200)}/index.html`
     // The known ceiling: this cannot be broken, and trying to would corrupt it.
