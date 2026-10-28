@@ -72,7 +72,14 @@ function safeMessage(error: unknown): string {
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body)
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) })
+  // Second line of defence for the freshness bug: the document is a live read, and
+  // a browser or proxy is free to reuse a headerless GET. Without this, a forced
+  // read could still be answered from cache and the difference would be invisible.
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(payload),
+    'Cache-Control': 'no-store',
+  })
   res.end(payload)
 }
 
@@ -116,6 +123,7 @@ async function buildRegionStatus(
   checkinStates?: ReadonlyMap<string, { todayCheckedIn?: boolean; todayCredit?: number; streakDays?: number }>,
   growthStates?: ReadonlyMap<string, WorkBuddyGrowthStatus>,
   taskStates?: ReadonlyMap<string, { outstanding: number }>,
+  forceCredits = false,
 ): Promise<WorkBuddyWebRegion> {
   if (options.client.fetchAccountEdition !== undefined) {
     await options.store.refreshAccountEditions(options.client.fetchAccountEdition.bind(options.client))
@@ -125,6 +133,7 @@ async function buildRegionStatus(
     credential => options.client.fetchCredits(credential),
     Math.max(1, activeMinutes) * 60_000,
     Math.max(1, inactiveMinutes) * 60_000,
+    { force: forceCredits },
   )
   const accounts: WorkBuddyWebAccount[] = accountRows.map(account => {
     const snapshot = snapshots.get(account.id)
@@ -175,13 +184,15 @@ async function buildRegionStatus(
  */
 export async function workBuddyAiWebStatus(
   deps: WorkBuddyStatusRouteOptions,
+  options?: { forceCredits?: boolean },
 ): Promise<WorkBuddyWebStatus> {
   const policy = deps.refreshPolicy?.() ?? { activeMinutes: 15, inactiveMinutes: 60 }
+  const forceCredits = options?.forceCredits === true
   const regionStatuses: WorkBuddyWebRegion[] = []
   for (const region of ['global', 'cn'] as const) {
-    const options = deps.regions?.[region]
-    if (options === undefined) continue
-    regionStatuses.push(await buildRegionStatus(options, policy.activeMinutes, policy.inactiveMinutes, deps.autoCheckin?.() ?? false, deps.checkinStates, deps.growthStates, deps.taskStates))
+    const regionOptions = deps.regions?.[region]
+    if (regionOptions === undefined) continue
+    regionStatuses.push(await buildRegionStatus(regionOptions, policy.activeMinutes, policy.inactiveMinutes, deps.autoCheckin?.() ?? false, deps.checkinStates, deps.growthStates, deps.taskStates, forceCredits))
   }
   const authStatus = await deps.store.status()
   const hasRegionSignIn = regionStatuses.some(region => region.signedIn)
@@ -225,7 +236,7 @@ export async function workBuddyAiWebStatus(
 
   try {
     const global = deps.regions?.global
-    if (global !== undefined) {
+    if (global !== undefined && !forceCredits) {
       const selectedId = global.store.selectedId()
       const cached = selectedId === undefined ? undefined : global.store.creditSnapshot(selectedId)
       if (cached?.credits !== undefined) return { ...status, credits: cached.credits }
@@ -254,8 +265,11 @@ export function workBuddyAiStatusHandler(
       json(res, 403, { error: 'request-not-trusted' })
       return
     }
+    // `?refresh=1` is the card's 刷新 button: bypass the credit TTL so the figure
+    // the user asked for is read now, not whatever the last background tick cached.
+    const forceCredits = new URL(req.url ?? '/', 'http://127.0.0.1').searchParams.get('refresh') === '1'
     try {
-      json(res, 200, await workBuddyAiWebStatus(deps))
+      json(res, 200, await workBuddyAiWebStatus(deps, { forceCredits }))
     } catch (error: unknown) {
       json(res, 500, { error: safeMessage(error) })
     }

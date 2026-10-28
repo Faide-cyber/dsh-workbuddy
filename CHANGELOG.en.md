@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.21] - 2026-10-28
+
+### Fixed
+
+- **The 刷新 button appeared to do nothing to the credit figure.** The cause was caching, not the network: the status route caches a per-account credit snapshot for the active/inactive interval from the settings page (15 minutes for the selected account by default), and the card's 刷新 button issued the *same* GET as its 60-second poll — while that cache was fresh, a click could only return the old number. 刷新 now sends `?refresh=1`, which bypasses the credit TTL and reads upstream for real (`refreshCreditSnapshots({force:true})`), while the poll keeps using the cache. The status response also gained `Cache-Control: no-store` so a browser cannot cache a live document either.
+- **The third README highlight was ambiguous**: "education accounts are marked as unsupported" was read as "the entire education edition is unsupported". It is a *sub-feature* difference — the upstream refuses check-in and growth tasks for education accounts as enterprise accounts (`daily-checkin` answers `400 code 10001`, the growth endpoints 403), while sign-in, multi-account, model catalog, chat and credits all work normally. Reworded to the user's own phrasing: the accounts line now says education accounts are supported, and the one-click check-in line drops the negation entirely.
+
 ## [1.0.20] - 2026-10-28
 
 ### Changed

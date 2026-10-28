@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { parseWorkBuddyAuth, parseWorkBuddyAuthIdentity, WorkBuddyAccountStore } from '../src/auth.ts'
+import type { WorkBuddyCredits } from '../src/upstream.ts'
 
 const cleanup: string[] = []
 afterEach(async () => {
@@ -76,6 +77,35 @@ describe('WorkBuddyAccountStore', () => {
     expect(accounts.find(account => account.edition === 'education')).toMatchObject({ edition: 'education', checkinEnabled: false })
     expect(await store.checkinSupported(accounts.find(account => account.edition === 'education')!.id)).toBe(false)
     expect(await store.checkinSupported(accounts.find(account => account.edition === 'personal')!.id)).toBe(true)
+  })
+
+  it('re-reads credits only when forced, not on every poll', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-workbuddy-ai-auth-'))
+    cleanup.push(dir)
+    const store = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath: join(dir, 'cn-auth.json'),
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    await store.importCredential({ accessToken: 'token', refreshToken: '', expiresAtMs: Date.now() + 3_600_000, domain: '', uid: 'u', source: 'dsh' })
+
+    let reads = 0
+    const fetchCredits = async (): Promise<WorkBuddyCredits> => {
+      reads += 1
+      return { total: reads, accounts: [] }
+    }
+    // A 15-minute TTL: the background poll must not re-read inside it.
+    const ttl = 15 * 60_000
+    await store.refreshCreditSnapshots(fetchCredits, ttl, ttl)
+    expect(reads).toBe(1)
+    await store.refreshCreditSnapshots(fetchCredits, ttl, ttl)
+    expect(reads).toBe(1)
+    // The card's 刷新 button passes `force`, which the TTL must not swallow.
+    await store.refreshCreditSnapshots(fetchCredits, ttl, ttl, { force: true })
+    expect(reads).toBe(2)
+    const forced = await store.refreshCreditSnapshots(fetchCredits, ttl, ttl, { force: true })
+    expect(reads).toBe(3)
+    expect([...forced.values()][0]?.credits?.total).toBe(3)
   })
 
   it('merges the official desktop edition into an existing sidecar account', async () => {

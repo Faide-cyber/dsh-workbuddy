@@ -405,10 +405,13 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
   const [modelQuery, setModelQuery] = useState('')
   const mounted = useRef(true)
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (forceCredits = false): Promise<void> => {
     setLoading(true)
     try {
-      const response = await fetch(WORKBUDDY_STATUS_PATH, { headers: { 'Accept': 'application/json' } })
+      // `forceCredits` is the 刷新 button. Without it the host answers from its
+      // per-account credit cache (TTL = the active/inactive policy), so a click
+      // looked like a no-op whenever the cache was still fresh.
+      const response = await fetch(forceCredits ? `${WORKBUDDY_STATUS_PATH}?refresh=1` : WORKBUDDY_STATUS_PATH, { headers: { 'Accept': 'application/json' } })
       if (!response.ok) {
         setError(`${t('requestFailed')} (HTTP ${response.status})`)
         return
@@ -727,7 +730,7 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                   <div style={rowStyle}>
                     <span style={statusStyle}>{waitingLogin ? t('connecting') : t('signedOut')}</span>
                     <span style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" style={buttonStyle} onClick={() => { void load() }} disabled={loading}>
+                      <button type="button" style={buttonStyle} onClick={() => { void load(true) }} disabled={loading}>
                         {loading ? t('refreshing') : t('refresh')}
                       </button>
                       <button
@@ -936,7 +939,7 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                             {displayNickname === undefined ? t('signedInAs', { nickname: '—' }) : t('signedInAs', { nickname: displayNickname })}
                           </span>
                           <span style={{ display: 'flex', gap: 8 }}>
-                            <button type="button" style={buttonStyle} onClick={() => { void load() }} disabled={loading}>
+                            <button type="button" style={buttonStyle} onClick={() => { void load(true) }} disabled={loading}>
                               {loading ? t('refreshing') : t('refresh')}
                             </button>
                             <button

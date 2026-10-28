@@ -460,7 +460,9 @@ declare class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
   resolveFor(accountId: string): Promise<WorkBuddyCredential>;
   resolve(): Promise<WorkBuddyCredential>;
   status(): Promise<WorkBuddyAuthStatus>;
-  refreshCreditSnapshots(fetchCredits: (credential: WorkBuddyCredential) => Promise<WorkBuddyCredits>, activeIntervalMs: number, inactiveIntervalMs: number): Promise<ReadonlyMap<string, WorkBuddyCreditSnapshot>>;
+  refreshCreditSnapshots(fetchCredits: (credential: WorkBuddyCredential) => Promise<WorkBuddyCredits>, activeIntervalMs: number, inactiveIntervalMs: number, options?: {
+    force?: boolean;
+  }): Promise<ReadonlyMap<string, WorkBuddyCreditSnapshot>>;
   creditSnapshot(accountId: string): WorkBuddyCreditSnapshot | undefined;
   select(accountId: string): Promise<void>;
   importCredential(credential: WorkBuddyCredential, accountId?: string): Promise<WorkBuddyCredential>;

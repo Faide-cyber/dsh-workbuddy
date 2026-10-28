@@ -985,13 +985,18 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
     fetchCredits: (credential: WorkBuddyCredential) => Promise<WorkBuddyCredits>,
     activeIntervalMs: number,
     inactiveIntervalMs: number,
+    options?: { force?: boolean },
   ): Promise<ReadonlyMap<string, WorkBuddyCreditSnapshot>> {
     const records = await this.readAccounts()
     const now = Date.now()
+    const force = options?.force === true
     for (const record of records) {
       const previous = this.creditSnapshots.get(record.id)
       const interval = record.id === this.selectedAccountId ? activeIntervalMs : inactiveIntervalMs
-      if (previous !== undefined && now - previous.checkedAt < interval) continue
+      // `force` is the card's 刷新 button: it must actually re-read the upstream
+      // rather than hand back the cached figure, which is what made that button
+      // look like it did nothing. The interval still paces the background timer.
+      if (!force && previous !== undefined && now - previous.checkedAt < interval) continue
       const running = this.creditInflight.get(record.id)
       if (running !== undefined) {
         await running

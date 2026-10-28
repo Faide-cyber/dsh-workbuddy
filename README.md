@@ -17,8 +17,8 @@
 </p>
 
 - **Sign-in**: per-region browser OAuth, no desktop sign-in at all; a credential from an installed desktop app can still be imported read-only
-- **Accounts**: region-isolated multi-account list, explicit switching, credit display and warnings; accounts can be given their own names; official **Personal** / **Education** edition badges are shown; the plugin's copies are kept apart from the desktop auth files
-- **One-click check-in**: daily check-in, the cat's growth trip and every growth-center task (签到 / 猫猫旅行) collected in a single action for supported personal accounts; education accounts are marked as unsupported; auto check-in is available and off by default
+- **Accounts**: region-isolated multi-account list, explicit switching, credit display and warnings; accounts can be given their own names; education accounts are now supported; the plugin's copies are kept apart from the desktop auth files
+- **One-click check-in**: daily check-in, the cat's growth trip and every growth-center task (签到 / 猫猫旅行) collected in a single action for supported personal accounts; auto check-in is available and off by default
 - **Device isolation**: each account's credential, its model catalog and its credit balance stand apart; switching accounts never touches in-flight requests
 - **Works out of the box**: install it, enable it, and use it from DSH — no extra configuration; DSH 0.2.x desktop is supported today
 
