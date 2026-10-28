@@ -114,4 +114,33 @@ describe('separateTokenBoundaries', () => {
     expect(separateTokenBoundaries('null')).toBe('null')
     expect(separateTokenBoundaries(JSON.stringify({ model: 'm' }))).toBe(JSON.stringify({ model: 'm' }))
   })
+
+  // Chinese prose has no spaces at all, so the space-replacing rule covered none of
+  // it: 2275 of the 9414 characters of DSH's real system prompt are CJK, and its
+  // longest unbroken stretch is 117 characters of Chinese.
+  const CJK = '这是一段没有空格的中文说明，用来验证中文段落也会被打断。'.repeat(4)
+
+  it('breaks a space-free Chinese paragraph by inserting a line break', () => {
+    const out = systemOf(separateTokenBoundaries(body(CJK)))
+    expect(out).not.toBe(CJK)
+    expect(out.includes(BREAK)).toBe(true)
+    expect(longestIntactRun(out)).toBeLessThanOrEqual(41)
+  })
+
+  it('inserts, rather than replaces, inside Chinese text', () => {
+    const out = systemOf(separateTokenBoundaries(body(CJK)))
+    expect(out.replaceAll(BREAK, '')).toBe(CJK)
+  })
+
+  it('never breaks inside a space-free ASCII token', () => {
+    const url = `https://example.com/${'a'.repeat(200)}/index.html`
+    // The known ceiling: this cannot be broken, and trying to would corrupt it.
+    expect(systemOf(separateTokenBoundaries(body(url)))).toBe(url)
+  })
+
+  it('is a fixed point, so a re-sent message costs no prefix cache', () => {
+    const long = `${CJK}\n\n${FINGERPRINT}\n\n${'filler prose. '.repeat(40)}`
+    const once = separateTokenBoundaries(body(long))
+    expect(separateTokenBoundaries(once)).toBe(once)
+  })
 })

@@ -29,6 +29,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { normalizeAccountEdition, type WorkBuddyCredential } from './auth.ts'
+import { rewriteFingerprintsInContent } from './fingerprints.ts'
 import type { WorkBuddyAccountEdition } from './status-paths.ts'
 import type { ProbeAttempt } from './probe.ts'
 import { PROBE_MAX_TOKENS, PROBE_PROMPT } from './probe.ts'
@@ -479,8 +480,9 @@ function billingHeaders(credential: WorkBuddyCredential): Record<string, string>
  *    HTTP 400 code 11128.
  * 3. `tool_choice` is flattened to the string form the upstream expects; an
  *    object form returns 400.
- * 4. `rewriteHarnessBanner` renames the brand word in the harness identity
- *    banner, which the domestic gateway fingerprints at the sentence start.
+ * 4. `rewriteFingerprints` rewords the prompt text the gateway matches, for
+ *    **both** regions (see `src/fingerprints.ts` — a known run is a known run,
+ *    and the rewrite leaves text without one byte-identical).
  * 5. `separateTokenBoundaries` is applied by the caller *only* for the domestic
  *    region (see {@link separateTokenBoundaries}).
  *
@@ -514,7 +516,7 @@ export function prepareChatBody(source: string, fixedEffort?: string): string {
   normalizeDeveloperRole(obj)
   normalizeToolChoice(obj)
   ensureLeadingSystemMessage(obj)
-  rewriteHarnessBanner(obj)
+  rewriteFingerprints(obj)
   if (fixedEffort !== undefined && obj['reasoning_effort'] === undefined) {
     obj['reasoning_effort'] = fixedEffort
   }
@@ -550,29 +552,33 @@ function ensureLeadingSystemMessage(obj: Record<string, unknown>): void {
 }
 
 /**
- * Replace the harness identity banner the domestic gateway fingerprints.
+ * Reword the gateway's known fingerprints throughout the request.
  *
- * The domestic gateway answers any request whose leading system message starts
- * with `You are an AI agent powered by DeepSeek Harness` (case-insensitive) with
- * HTTP 400 code 11128 instead of reaching a model. Only the brand word is
- * rewritten, so the sentence keeps its meaning and everything after it is
- * untouched; a banner anywhere other than the sentence start is left alone
- * because the gateway only rejects that position.
+ * Applied to `system` and `assistant` content in **every** region, not just the
+ * domestic one: a known run is a known run, the reword is semantically inert,
+ * and text that contains no known run comes back as the very same string, so an
+ * unaffected request keeps its prefix cache (`src/fingerprints.ts`).
+ *
+ * `assistant` is in scope because a reply that quotes DSH's own prompt
+ * re-introduces the run on the next turn — a system-only rewrite defeats itself
+ * exactly there (verified against the live gateway). `user` and `tool` are out
+ * of scope: that is the user's own text and file contents, and the gateway does
+ * not match either.
  */
-function rewriteHarnessBanner(obj: Record<string, unknown>): void {
+function rewriteFingerprints(obj: Record<string, unknown>): void {
   const messages = obj['messages']
-  if (!Array.isArray(messages) || messages.length === 0) return
-  const first = messages[0]
-  if (typeof first !== 'object' || first === null || Array.isArray(first)) return
-  const message = first as Record<string, unknown>
-  if (message['role'] !== 'system') return
-  message['content'] = rewriteBannerIn(message['content'])
+  if (!Array.isArray(messages)) return
+  for (const message of messages) {
+    if (typeof message !== 'object' || message === null || Array.isArray(message)) continue
+    const wrapped = message as Record<string, unknown>
+    const role = wrapped['role']
+    if (role !== 'system' && role !== 'assistant') continue
+    wrapped['content'] = rewriteFingerprintsInContent(wrapped['content'])
+  }
 }
 
-const HARNESS_BANNER = /^(You are an AI agent powered by )DeepSeek Harness\b/i
-
 /**
- * Same prompt, different bytes: swap a space for a line break after every long stretch.
+ * Same prompt, different bytes: break up every long stretch of characters.
  *
  * The domestic gateway (code 11128, "Illegal API invocation from an unapproved
  * channel") blocks a request whose text contains one of a set of **literal
@@ -580,8 +586,8 @@ const HARNESS_BANNER = /^(You are an AI agent powered by )DeepSeek Harness\b/i
  * gateway: the untouched prompt is 400, a copy with one word reworded is 200, and
  * a copy with a few spaces swapped for a line break is 200 too — while the model
  * still reads the prompt back correctly. Recurring fingerprints get reworded one at a
- * time today; this breaks the runs instead, so a fingerprint DSH adds in a later
- * release cannot take the plugin down again.
+ * time today (see `src/fingerprints.ts`); this breaks the runs instead, so a
+ * fingerprint DSH adds in a later release cannot take the plugin down again.
  *
  * The swap used to be U+00A0. On 2026-10-29 the gateway blocked the prompt again
  * with the no-break spaces in place: it now normalizes U+00A0 (and strips U+200B)
@@ -591,7 +597,7 @@ const HARNESS_BANNER = /^(You are an AI agent powered by )DeepSeek Harness\b/i
  *
  * {@link MAX_RUN_CHARS} bounds what survives: no stretch keeps more than ~50
  * consecutive original characters, well under the 49-character identity banner and
- * the 111-character run the gateway matched. Spacing the swaps by distance rather
+ * the 112-character run the gateway matched. Spacing the breaks by distance rather
  * than by count keeps the bill small.
  *
  * It rewrites **`system` and `assistant` messages** — nothing else. Measured role
@@ -626,19 +632,46 @@ export function separateTokenBoundaries(source: string): string {
 }
 
 /**
- * Distance after which the next space becomes a line break.
+ * Distance after which the next break opportunity is taken.
  *
  * 40, not 90: English prose spaces words every ~4–5 characters, so a run can
  * outlive the threshold by that much before a space arrives. 40 keeps every
  * observed fingerprint well broken — the 49-character identity banner and the
- * 112-character `@`-reference run included — while a space-free stretch (a long
- * URL or base64 blob) is the known ceiling: nothing inside such a stretch can be
- * swapped, because this rewrites spaces rather than inserting characters.
+ * 112-character `@`-reference run included. A space-free ASCII stretch (a long
+ * URL or base64 blob) is the known ceiling: nothing inside it is broken, because
+ * the break goes at a space or before a wide character, never inside an ASCII
+ * token.
  */
 const MAX_RUN_CHARS = 40
 
-/** What a swapped space becomes. See {@link separateString} for why not a space character. */
+/** What a break is. See {@link separateString} for why not a space-like character. */
 const BOUNDARY_BREAK = '\n'
+
+/** Whitespace that already splits the text. A plain space is handled separately: it is a break candidate. */
+const WHITESPACE = /\s/u
+
+/**
+ * Characters that carry their own word boundaries: CJK ideographs, kana, hangul,
+ * and fullwidth forms.
+ *
+ * Chinese and Japanese prose is written without spaces, so a paragraph is a
+ * single space-free stretch — the space-replacing rule below covers none of it.
+ * 2275 of the 9414 characters of DSH's real system prompt are such characters,
+ * and the longest unbroken stretch in that prompt is 117 characters of Chinese,
+ * not a URL.
+ */
+const WIDE_CHAR = /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]/
+
+/**
+ * Wide characters a line must not start with.
+ *
+ * A break inside Chinese text is taken just *before* the character that would
+ * otherwise start the next stretch, so without this it would land right before a
+ * comma or a full stop — a stray line feed in the middle of a sentence, which reads
+ * like a broken prompt. Skipping these moves the break past the punctuation, where
+ * a line end is ordinary typography.
+ */
+const WIDE_LEAD_IN = /[、。，؛；：！？…—）」』】》〉｝〕］]/
 
 function separateContentBoundaries(content: unknown): unknown {
   if (typeof content === 'string') return separateString(content)
@@ -652,39 +685,54 @@ function separateContentBoundaries(content: unknown): unknown {
 }
 
 /**
- * Swap a space for a line break a little after every {@link MAX_RUN_CHARS} characters.
+ * Break up a long text after every {@link MAX_RUN_CHARS} characters.
  *
- * Spacing by *distance* rather than by count bounds the cost: the swap lands at
- * the first space past the limit, so prose pays one swap per ~40 characters
- * however dense its spaces are, and a message shorter than the limit is returned
- * byte-identical.
+ * Two kinds of stretch get broken:
+ *
+ * - A spaced stretch takes its break in the first space past the limit (the space
+ *   becomes the break), so prose pays one break per ~40 characters however dense
+ *   its spaces are.
+ * - A stretch of {@link WIDE_CHAR} characters has no space to take: a break is
+ *   **inserted** before the next such character. Inserting rather than replacing is
+ *   what gives the same guarantee — no stretch longer than the limit survives.
+ *
+ * A message shorter than the limit is returned byte-identical, and the output is a
+ * fixed point: the break always lands on the **first** opportunity past the limit,
+ * so no stretch of the output reaches the limit again, and a break already in the
+ * text resets the distance (nothing can be matched across one). Running this twice
+ * therefore changes nothing. That matters because the upstream bills by prefix
+ * cache — a transform that reshuffled bytes on every resend would cost more than
+ * the block it prevents.
  */
 function separateString(text: string): string {
   if (text.length <= MAX_RUN_CHARS) return text
-  let sinceSwap = 0
+  let sinceBreak = 0
   let out = ''
   for (const char of text) {
-    if (char === ' ' && sinceSwap >= MAX_RUN_CHARS) {
+    if (char === ' ' && sinceBreak >= MAX_RUN_CHARS) {
       out += BOUNDARY_BREAK
-      sinceSwap = 0
+      sinceBreak = 0
       continue
     }
-    sinceSwap++
+    // A newline (or any other whitespace) already splits the text, so the distance
+    // restarts there — otherwise the next stretch would be measured from a point
+    // before a break and get broken twice.
+    if (char !== ' ' && WHITESPACE.test(char)) {
+      sinceBreak = 0
+      out += char
+      continue
+    }
+    if (sinceBreak >= MAX_RUN_CHARS && WIDE_CHAR.test(char)) {
+      out += BOUNDARY_BREAK
+      sinceBreak = 0
+    }
+    sinceBreak++
     out += char
   }
   return out
 }
 
-function rewriteBannerIn(content: unknown): unknown {
-  if (typeof content === 'string') return content.replace(HARNESS_BANNER, '$1DSH')
-  if (!Array.isArray(content)) return content
-  return content.map((part) => {
-    if (typeof part !== 'object' || part === null || Array.isArray(part)) return part
-    const wrapper = part as Record<string, unknown>
-    if (wrapper['type'] !== 'text' || typeof wrapper['text'] !== 'string') return part
-    return { ...wrapper, text: wrapper['text'].replace(HARNESS_BANNER, '$1DSH') }
-  })
-}
+
 
 /** Rewrite OpenAI `tool_choice` spellings into the upstream's string form. */
 function normalizeToolChoice(obj: Record<string, unknown>): void {
@@ -1124,6 +1172,14 @@ export class WorkBuddyUpstreamClient {
   /**
    * One probe request: a real streaming chat call carrying the effort under
    * test.
+   *
+   * This is the plugin's **second** outbound chat entry after
+   * {@link chatStream}; every other outbound call is a metadata endpoint that
+   * carries no prompt text. It is safe by construction — the body is
+   * {@link PROBE_PROMPT} and nothing else, so no prompt prose of DSH's can reach
+   * the gateway through it — and that safety is the reason it does **not** run
+   * `prepareChatBody`/`separateTokenBoundaries`. Anything that adds caller text
+   * here inherits the fingerprinting duty; keep this body fixed.
    *
    * Shares {@link chatHeaders} with the normal chat path on purpose — a probe
    * must describe what a real message would experience, not a parallel code

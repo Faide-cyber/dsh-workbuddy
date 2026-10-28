@@ -664,8 +664,9 @@ declare function regionOf(domain: string): WorkBuddyRegion;
  *    HTTP 400 code 11128.
  * 3. `tool_choice` is flattened to the string form the upstream expects; an
  *    object form returns 400.
- * 4. `rewriteHarnessBanner` renames the brand word in the harness identity
- *    banner, which the domestic gateway fingerprints at the sentence start.
+ * 4. `rewriteFingerprints` rewords the prompt text the gateway matches, for
+ *    **both** regions (see `src/fingerprints.ts` — a known run is a known run,
+ *    and the rewrite leaves text without one byte-identical).
  * 5. `separateTokenBoundaries` is applied by the caller *only* for the domestic
  *    region (see {@link separateTokenBoundaries}).
  *
@@ -688,7 +689,7 @@ declare function regionOf(domain: string): WorkBuddyRegion;
  */
 declare function prepareChatBody(source: string, fixedEffort?: string): string;
 /**
- * Same prompt, different bytes: swap a space for a line break after every long stretch.
+ * Same prompt, different bytes: break up every long stretch of characters.
  *
  * The domestic gateway (code 11128, "Illegal API invocation from an unapproved
  * channel") blocks a request whose text contains one of a set of **literal
@@ -696,8 +697,8 @@ declare function prepareChatBody(source: string, fixedEffort?: string): string;
  * gateway: the untouched prompt is 400, a copy with one word reworded is 200, and
  * a copy with a few spaces swapped for a line break is 200 too — while the model
  * still reads the prompt back correctly. Recurring fingerprints get reworded one at a
- * time today; this breaks the runs instead, so a fingerprint DSH adds in a later
- * release cannot take the plugin down again.
+ * time today (see `src/fingerprints.ts`); this breaks the runs instead, so a
+ * fingerprint DSH adds in a later release cannot take the plugin down again.
  *
  * The swap used to be U+00A0. On 2026-10-29 the gateway blocked the prompt again
  * with the no-break spaces in place: it now normalizes U+00A0 (and strips U+200B)
@@ -707,7 +708,7 @@ declare function prepareChatBody(source: string, fixedEffort?: string): string;
  *
  * {@link MAX_RUN_CHARS} bounds what survives: no stretch keeps more than ~50
  * consecutive original characters, well under the 49-character identity banner and
- * the 111-character run the gateway matched. Spacing the swaps by distance rather
+ * the 112-character run the gateway matched. Spacing the breaks by distance rather
  * than by count keeps the bill small.
  *
  * It rewrites **`system` and `assistant` messages** — nothing else. Measured role
@@ -770,6 +771,14 @@ declare class WorkBuddyUpstreamClient {
   /**
    * One probe request: a real streaming chat call carrying the effort under
    * test.
+   *
+   * This is the plugin's **second** outbound chat entry after
+   * {@link chatStream}; every other outbound call is a metadata endpoint that
+   * carries no prompt text. It is safe by construction — the body is
+   * {@link PROBE_PROMPT} and nothing else, so no prompt prose of DSH's can reach
+   * the gateway through it — and that safety is the reason it does **not** run
+   * `prepareChatBody`/`separateTokenBoundaries`. Anything that adds caller text
+   * here inherits the fingerprinting duty; keep this body fixed.
    *
    * Shares {@link chatHeaders} with the normal chat path on purpose — a probe
    * must describe what a real message would experience, not a parallel code
@@ -1184,6 +1193,74 @@ declare class WorkBuddyOAuthLogin {
   cancel(): void;
 }
 //#endregion
+//#region src/fingerprints.d.ts
+/**
+ * Rewrites for prompt text the WorkBuddy gateway fingerprints (HTTP 400
+ * `code 11128`, "Illegal API invocation from an unapproved channel").
+ *
+ * The gateway does not rate-limit a client or inspect headers — it matches
+ * **literal character runs** lifted from the client's own prompt text, in
+ * `system` and `assistant` content (measured; `user`, `tool` results,
+ * `reasoning_content` and `tool_calls[].function.arguments` all pass — see
+ * {@link rewriteContentFingerprints}). Two defences follow from that:
+ *
+ * 1. **This table**: reword a known run. The wording changes, the bytes that
+ *    matched do not survive, and a rewrite keeps working even if the gateway
+ *    later normalizes whitespace (which it does: on 2026-10-29 it collapsed the
+ *    U+00A0 separators the plugin used to inject, silently disarming them).
+ * 2. **Line-break separation** (`separateTokenBoundaries`): break long runs
+ *    without knowing which one matched. That one catches runs nobody registered
+ *    yet, and is the reason this table may stay small.
+ *
+ * ## Adding an entry
+ *
+ * Every entry needs **live evidence**: the unmodified run answers 400/11128 and
+ * the reworded run answers 200. A run copied from another project's table
+ * without measuring it here is an unverified mutation of the user's prompt.
+ *
+ * The replacement must stay semantically equivalent — these are the model's
+ * instructions, not decoration. Prefer the smallest edit that removes the run.
+ *
+ * @module dsh-workbuddy/fingerprints
+ */
+interface ContentFingerprint {
+  /** Literal run the gateway matches. Matched case-insensitively, as a plain string. */
+  find: string;
+  /** Equivalent wording that no longer contains {@link find}. */
+  replace: string;
+  /** Where the evidence came from. Required — see the module doc. */
+  note: string;
+}
+/**
+ * Known fingerprints of DSH's own prompt text, plus the client-identity banner.
+ *
+ * All entries apply to DSH's own words. Fingerprints of *other* clients (ZCode's
+ * git-status line, Claude Code's identity sentence) are deliberately absent:
+ * this plugin only ever sends DSH's prompt.
+ */
+declare const CONTENT_FINGERPRINTS: readonly ContentFingerprint[];
+/**
+ * Reword known fingerprints in one piece of prompt text.
+ *
+ * **Text without a fingerprint is returned unchanged, byte for byte** — a
+ * requirement, not a nicety: the upstream bills by prefix cache, so rebuilding a
+ * string for no reason turns every turn into a cold request. Hence the
+ * `includes` pre-check per rule: no match, no new string.
+ *
+ * This function does not know about roles. Which text is passed in is the
+ * caller's policy; see {@link rewriteContentFingerprints} for the measured
+ * answer.
+ */
+declare function rewriteFingerprintsInText(text: string): string;
+/**
+ * Reword a message `content` value (a string or an array of parts).
+ *
+ * Only parts carrying a string `text` are touched; a part of any other shape is
+ * returned as-is, and a content array is rebuilt only when at least one part
+ * actually changed.
+ */
+declare function rewriteFingerprintsInContent(content: unknown): unknown;
+//#endregion
 //#region src/host-heartbeat.d.ts
 /**
  * Host-side heartbeat: a small JSON file written under `$DSH_HOME` once the
@@ -1313,4 +1390,4 @@ declare const Config: z<Config>;
  */
 declare function apply(ctx: Context, config: Config): void;
 //#endregion
-export { Config, LOGIN_TIMEOUT_MS, PROBE_EFFORT_CANDIDATES, type ProbeAttempt, type ProbeOutcome, type ProbeSender, type UpstreamErrorKind, WORKBUDDY_AUTH_FILENAME, WORKBUDDY_AUTH_FILE_ENV, WORKBUDDY_CN_AUTH_FILENAME, WORKBUDDY_CN_AUTH_FILE_ENV, WORKBUDDY_CN_DESKTOP_AUTH_BASENAME, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_CONTROL_PATH, WORKBUDDY_DESKTOP_AUTH_BASENAME, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_HOST_HEARTBEAT_FILENAME, WORKBUDDY_PROBE_FILENAME, WORKBUDDY_PROVIDER, WORKBUDDY_SETTINGS_NS, WORKBUDDY_STATUS_PATH, type WorkBuddyAccountEdition, WorkBuddyAccountStore, type WorkBuddyAccountSummary, type WorkBuddyAdapter, type WorkBuddyAuthIdentity, type WorkBuddyAuthStatus, WorkBuddyCatalog, type WorkBuddyChatResult, type WorkBuddyControlAction, type WorkBuddyCredential, WorkBuddyCredentialStore, type WorkBuddyCredentialStoreLike, type WorkBuddyCredits, type WorkBuddyEffort, type WorkBuddyGrowthStatus, type WorkBuddyHostHeartbeat, type WorkBuddyModelBilling, type WorkBuddyModelInfo, type WorkBuddyModelReasoning, type WorkBuddyModelScope, WorkBuddyOAuthLogin, type WorkBuddyProbeRecord, WorkBuddyProbeService, type WorkBuddyProbeStatus, WorkBuddyProbeStore, type WorkBuddyProbeValidation, type WorkBuddyRefreshOutcome, type WorkBuddyRegion, type WorkBuddyShim, WorkBuddyUpstreamClient, type WorkBuddyUpstreamModel, type WorkBuddyWebAccount, type WorkBuddyWebCheckin, type WorkBuddyWebModelBadge, type WorkBuddyWebProbeModel, type WorkBuddyWebProbeSection, type WorkBuddyWebRegion, type WorkBuddyWebStatus, apply, classifyUpstreamError, clearHostHeartbeat, composeCatalog, createWorkBuddyAdapter, createWorkBuddyShim, credentialFromPluginToken, defaultDesktopAuthCandidates, defaultDesktopAuthPath, fetchGrowthRewardToday, fetchGrowthStatus, fingerprintModel, inject, isFreeCredits, isHeartbeatProcessAlive, name, normalizeAccountEdition, normalizeCredits, parseWorkBuddyAuth, parseWorkBuddyAuthIdentity, prepareChatBody, probeModel, processStartTimeMs, randomSentinel, readHostHeartbeat, reasoningFields, regionOf, runGrowthTrip, separateTokenBoundaries, workBuddyHostHeartbeatPath, workBuddyOwnAuthPath, workBuddyProbePath, workBuddyRegionOwnAuthPath };
+export { CONTENT_FINGERPRINTS, Config, type ContentFingerprint, LOGIN_TIMEOUT_MS, PROBE_EFFORT_CANDIDATES, type ProbeAttempt, type ProbeOutcome, type ProbeSender, type UpstreamErrorKind, WORKBUDDY_AUTH_FILENAME, WORKBUDDY_AUTH_FILE_ENV, WORKBUDDY_CN_AUTH_FILENAME, WORKBUDDY_CN_AUTH_FILE_ENV, WORKBUDDY_CN_DESKTOP_AUTH_BASENAME, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_CONTROL_PATH, WORKBUDDY_DESKTOP_AUTH_BASENAME, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_HOST_HEARTBEAT_FILENAME, WORKBUDDY_PROBE_FILENAME, WORKBUDDY_PROVIDER, WORKBUDDY_SETTINGS_NS, WORKBUDDY_STATUS_PATH, type WorkBuddyAccountEdition, WorkBuddyAccountStore, type WorkBuddyAccountSummary, type WorkBuddyAdapter, type WorkBuddyAuthIdentity, type WorkBuddyAuthStatus, WorkBuddyCatalog, type WorkBuddyChatResult, type WorkBuddyControlAction, type WorkBuddyCredential, WorkBuddyCredentialStore, type WorkBuddyCredentialStoreLike, type WorkBuddyCredits, type WorkBuddyEffort, type WorkBuddyGrowthStatus, type WorkBuddyHostHeartbeat, type WorkBuddyModelBilling, type WorkBuddyModelInfo, type WorkBuddyModelReasoning, type WorkBuddyModelScope, WorkBuddyOAuthLogin, type WorkBuddyProbeRecord, WorkBuddyProbeService, type WorkBuddyProbeStatus, WorkBuddyProbeStore, type WorkBuddyProbeValidation, type WorkBuddyRefreshOutcome, type WorkBuddyRegion, type WorkBuddyShim, WorkBuddyUpstreamClient, type WorkBuddyUpstreamModel, type WorkBuddyWebAccount, type WorkBuddyWebCheckin, type WorkBuddyWebModelBadge, type WorkBuddyWebProbeModel, type WorkBuddyWebProbeSection, type WorkBuddyWebRegion, type WorkBuddyWebStatus, apply, classifyUpstreamError, clearHostHeartbeat, composeCatalog, createWorkBuddyAdapter, createWorkBuddyShim, credentialFromPluginToken, defaultDesktopAuthCandidates, defaultDesktopAuthPath, fetchGrowthRewardToday, fetchGrowthStatus, fingerprintModel, inject, isFreeCredits, isHeartbeatProcessAlive, name, normalizeAccountEdition, normalizeCredits, parseWorkBuddyAuth, parseWorkBuddyAuthIdentity, prepareChatBody, probeModel, processStartTimeMs, randomSentinel, readHostHeartbeat, reasoningFields, regionOf, rewriteFingerprintsInContent, rewriteFingerprintsInText, runGrowthTrip, separateTokenBoundaries, workBuddyHostHeartbeatPath, workBuddyOwnAuthPath, workBuddyProbePath, workBuddyRegionOwnAuthPath };

@@ -122,6 +122,12 @@ export {
   type WorkBuddyUpstreamModel,
 } from './upstream.ts'
 export {
+  CONTENT_FINGERPRINTS,
+  rewriteFingerprintsInContent,
+  rewriteFingerprintsInText,
+  type ContentFingerprint,
+} from './fingerprints.ts'
+export {
   WORKBUDDY_HOST_HEARTBEAT_FILENAME,
   clearHostHeartbeat,
   isHeartbeatProcessAlive,
