@@ -2,6 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.23] - 2026-10-30
+
+### 修复
+
+- **国际版也开始整批 400 `code 11128`「Illegal API invocation from an unapproved channel」**。同一个业务码有两套成因，靠 `msg` 分：国际区历史成因是 `request illegal`（缺 `X-Conversation-ID`/`-Request-ID`/`-Message-ID` 三件套，1.0.15 已补）；本次 msg 与国内**逐字相同**，说明国际网关自 2026-10-30 起启用了同一条内容级字面指纹检查。而 1.0.22 把结构层（换行打断）用 `regionOf(credential.domain) === 'cn'` 限死在国内，语义层只覆盖已登记的两条原文 ⇒ 国际区一旦出现未登记的过长字面串就照拦。现在结构层**两个区都跑**（它只移动空白字符，语义与字节数都不变），区域判断不再参与防护决策。
+- README 排查表补上国际版两种 11128 的判别方式（看 `msg` 是 `request illegal` 还是 `Illegal API invocation...`）。
+
+### 变更
+
+- **支持 DSH 0.2.1-rc.5**：逐文件哈希比对 rc.3 ↔ rc.5，插件实际 import 的十个 `@deepseek-ai/dsh-*` 包（`dsh-llm`、`dsh-llm-pi-ai`、`dsh-system-prompt`、`dsh-file-reference`、`dsh-atomic-write`、`dsh-attachment`、`dsh-home-paths`、`dsh-host-webserver`、`dsh-settings`、`dsh-client-ui-primitives`）代码**逐字节相同**，唯二差异是各包 `package.json` 的 version/pin 与 `dsh-client-modules` 里一行构建 commit 号（`be72761` → `d4db512`）⇒ rc.5 是纯重发版，零 API 变化，插件无需改动。1.0.20 起的 peer 范围 `>=0.2.1-rc.1 <0.3.0-0` 已覆盖 rc.5，真机上不在 `compatibility.json` 豁免名单里也能装（靠范围本身过闸）。
+- 测试：区域用例从「国际区只改写不打断」改为「两区都改写也打断」，19 文件 / 162 全绿；`tsc` 两个工程与 `tsdown` 构建均干净。
+- 已知上限不变：无空格的长 ASCII 串（URL、base64、`a/b/c` 斜杠串）仍打不断。
+
 ## [1.0.22] - 2026-10-29
 
 ### 修复

@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.23] - 2026-10-30
+
+### Fixed
+
+- **The international region started failing every request with `400 code 11128` "Illegal API invocation from an unapproved channel"**. This business code has two causes, distinguished by `msg`: the historical international one was `request illegal` (missing the `X-Conversation-ID`/`-Request-ID`/`-Message-ID` trio, supplied since 1.0.15); this `msg` is **word for word the domestic one**, meaning the international gateway turned on the same content-level literal fingerprint check on 2026-10-30. 1.0.22 pinned the structural layer (line-feed breaking) to `regionOf(credential.domain) === 'cn'` while the semantic layer only covers the two registered phrases — so any unregistered over-long run on the international route was still rejected. The structural layer now runs in **both regions** (it only moves whitespace; meaning and byte count are unchanged), and the region no longer takes part in the protection decision.
+- The troubleshooting table now explains how to tell the two international 11128 causes apart (look at `msg`: `request illegal` versus `Illegal API invocation...`).
+
+### Changed
+
+- **Support for DSH 0.2.1-rc.5**: a file-by-file hash comparison of rc.3 against rc.5 shows the ten `@deepseek-ai/dsh-*` packages this plugin actually imports (`dsh-llm`, `dsh-llm-pi-ai`, `dsh-system-prompt`, `dsh-file-reference`, `dsh-atomic-write`, `dsh-attachment`, `dsh-home-paths`, `dsh-host-webserver`, `dsh-settings`, `dsh-client-ui-primitives`) are **byte-for-byte identical**; the only differences are each `package.json` version/pin and one build-commit line in `dsh-client-modules` (`be72761` → `d4db512`). rc.5 is a pure re-release with zero API change, so no plugin change was needed. The peer range introduced in 1.0.20 (`>=0.2.1-rc.1 <0.3.0-0`) already covers rc.5, and a real install passes the gate on the range itself rather than via a `compatibility.json` exemption.
+- Tests: the region cases changed from "international rewrites but does not break" to "both regions rewrite and break"; 19 files / 162 tests green, both `tsc` projects and the `tsdown` build clean.
+- Known ceiling unchanged: space-free long ASCII runs (URLs, base64, `a/b/c`-style paths) still cannot be broken.
+
 ## [1.0.22] - 2026-10-29
 
 ### Fixed
