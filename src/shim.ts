@@ -23,7 +23,7 @@ import { Readable } from 'node:stream'
 import type { WorkBuddyCredentialStoreLike } from './auth.ts'
 import type { WorkBuddyCatalog } from './catalog.ts'
 import { hostIsLoopback, originIsLoopback } from './loopback.ts'
-import { isModelNotAllowed, prepareChatBody, regionOf, separateTokenBoundaries, WorkBuddyUpstreamClient, type UpstreamErrorKind } from './upstream.ts'
+import { isModelNotAllowed, prepareChatBody, separateTokenBoundaries, WorkBuddyUpstreamClient, type UpstreamErrorKind } from './upstream.ts'
 
 /** Minimal logger surface the plugin context already provides. */
 export interface ShimLogger {
@@ -246,11 +246,12 @@ export function createWorkBuddyShim(options: WorkBuddyShimOptions): WorkBuddyShi
 
     const raw = (await readBody(req)).toString('utf8')
     const prepared = prepareChatBody(raw, fixedEffortOf(catalog, modelOf(raw)))
-    // The domestic gateway fingerprints DSH's own prompt text as literal
-    // character runs and answers 11128 for a match. Rewording them is a running
-    // battle; breaking the runs is not, so this transform is applied on the
-    // region that fingerprints, and never on the international one.
-    const forwarded = regionOf(credential.domain) === 'cn' ? separateTokenBoundaries(prepared) : prepared
+    // Both gateways fingerprint DSH's own prompt text as literal character runs
+    // and answer 11128 for a match: the domestic one did from the start, the
+    // international one joined on 2026-10-30. Rewording known runs is a running
+    // battle, breaking the runs is not, so the structural layer runs everywhere.
+    // It only moves white space, so the international route loses nothing.
+    const forwarded = separateTokenBoundaries(prepared)
 
     const controller = new AbortController()
     req.on('close', () => controller.abort())

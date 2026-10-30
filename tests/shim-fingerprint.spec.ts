@@ -84,10 +84,10 @@ afterEach(async () => {
   shim = undefined
 })
 
-/** Line feeds present — the domestic route adds some, the international route must not. */
+/** Line feeds present — both routes add them; short text must not gain any. */
 const breaks = (text: string): number => text.split('\n').length - 1
 
-describe('shim fingerprint guard by region', () => {
+describe('shim fingerprint guard', () => {
   it('rewords and breaks a known run on the domestic route', async () => {
     const system = systemOf(await forwardedBody(cnCredential))
     expect(system.includes(FINGERPRINT)).toBe(false)
@@ -96,26 +96,25 @@ describe('shim fingerprint guard by region', () => {
     expect(breaks(system)).toBeGreaterThan(breaks(SYSTEM.replace(FINGERPRINT, REWORDED)))
   })
 
-  it('rewords a known run on the international route without touching layout', async () => {
-    // The reword is semantically inert, so it runs everywhere; only the domestic
-    // route needs the line breaks. Byte-for-byte here, no break inserted.
-    expect(systemOf(await forwardedBody(globalCredential))).toBe(SYSTEM.replace(FINGERPRINT, REWORDED))
+  it('rewords and breaks a known run on the international route too', async () => {
+    // The international gateway started answering 11128 for the same literal
+    // runs on 2026-10-30, so it gets the same two layers; only white space moves.
+    const system = systemOf(await forwardedBody(globalCredential))
+    expect(system.includes(FINGERPRINT)).toBe(false)
+    expect(flat(system)).toBe(flat(SYSTEM.replace(FINGERPRINT, REWORDED)))
+    expect(breaks(system)).toBeGreaterThan(breaks(SYSTEM.replace(FINGERPRINT, REWORDED)))
   })
 
-  it('forwards a fingerprint-free turn byte-identically on the international route', async () => {
-    // Anything else would cost the upstream prefix cache on every request.
-    const messages = [{ role: 'system', content: BENIGN }, { role: 'user', content: 'hi' }]
-    expect(systemOf(await forwardedBody(globalCredential, messages))).toBe(BENIGN)
-  })
-
-  it('breaks long text on the domestic route even with no known run in it', async () => {
+  it('breaks long text with no known run in it, on both routes', async () => {
     // The point of the structural layer: a fingerprint DSH adds in a later release
     // is broken before anyone has registered it. Only the layout may change.
     const messages = [{ role: 'system', content: BENIGN }, { role: 'user', content: 'hi' }]
-    const system = systemOf(await forwardedBody(cnCredential, messages))
-    expect(system).not.toBe(BENIGN)
-    expect(flat(system)).toBe(flat(BENIGN))
-    expect(breaks(system)).toBeGreaterThan(breaks(BENIGN))
+    for (const credential of [cnCredential, globalCredential]) {
+      const system = systemOf(await forwardedBody(credential, messages))
+      expect(system).not.toBe(BENIGN)
+      expect(flat(system)).toBe(flat(BENIGN))
+      expect(breaks(system)).toBeGreaterThan(breaks(BENIGN))
+    }
   })
 
   it('leaves short text byte-identical on both routes', async () => {
