@@ -44,6 +44,23 @@ describe('reasoningFields', () => {
     expect(fields.thinkingLevelMap).toMatchObject({ high: 'high', low: null, off: null })
   })
 
+  // The live catalog ships this exact shape for `deepseek-v4.1-flash`: a declared
+  // effort set together with both `onlyReasoning: true` and `canDisableThinking: true`.
+  // Trusting the second flag put a string `off` in the map, and any request that
+  // selected no level then carried `reasoning_effort: "off"` — a value the provider
+  // rejects. Compaction never selects a level, so it failed on every attempt.
+  it('keeps off the wire when a declared set also claims thinking is switchable', () => {
+    const fields = reasoningFields(row({
+      supports: true,
+      onlyReasoning: true,
+      supportedEfforts: ['low', 'high', 'max'],
+      defaultEffort: 'high',
+      canDisableThinking: true,
+    }))
+    expect(fields.reasoning).toBe(true)
+    expect(fields.thinkingLevelMap).toMatchObject({ off: null, low: 'low', high: 'high', max: 'max' })
+  })
+
   it('still offers nothing when no effort is declared at all', () => {
     const info = row({ supports: true, onlyReasoning: false, canDisableThinking: false })
     expect(declaredFixedEffort(info)).toBeUndefined()

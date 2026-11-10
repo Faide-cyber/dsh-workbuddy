@@ -178,7 +178,18 @@ export function reasoningFields(
   }
   const map: Record<ModelThinkingLevel, string | null> = {
     // Probing never grants `off`; only an explicit declaration does.
-    off: reasoning.canDisableThinking === true && declared !== undefined && declared.length > 0 ? 'off' : null,
+    //
+    // `onlyReasoning: true` means the row always thinks, so `off` must stay off
+    // the wire even when the same row also carries `canDisableThinking: true`.
+    // Upstream ships exactly that contradictory pair on `deepseek-v4.1-flash`:
+    // trusting `canDisableThinking` gave pi-ai a string `off`, and a request
+    // that selected no level (the UI's "default") then emitted
+    // `reasoning_effort: "off"`, which the provider rejects with 400/code 11133.
+    // Compaction is hit worst: dsh-compaction-basic assembles its call without a
+    // `reasoningEffort`, so every summarization request landed on that value.
+    off: reasoning.onlyReasoning === true
+      ? null
+      : reasoning.canDisableThinking === true && declared !== undefined && declared.length > 0 ? 'off' : null,
     // `minimal` is not in the upstream effort vocabulary, so no declared set —
     // and no probe candidate — can ever contain it.
     minimal: null,
