@@ -2,6 +2,17 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.24] - 2026-11-14
+
+### 修复
+
+- **部分模型用默认推理档位时整批 400 `code 11133`，上下文压缩每次必挂**。上游目录里 `deepseek-v4.1-flash` 同时声明了两个互相矛盾的标记：`onlyReasoning: true` 表示这个模型只提供思考模式，`canDisableThinking: true` 表示思考可以关掉。插件当时的取值顺序先信了后者，把「关闭」这个档位翻译成一个真会发到上游的字符串 `off`。界面默认不选档位时 pi-ai 会把这个 `off` 直接写进请求体，上游不认这个值，于是回 400 `code 11133`；手动改成 `low`/`high` 走的是另一条取值分支，结果合法，所以只有默认路径会坏。压缩之所以每次必挂是同一个原因而不是第二个 bug：`dsh-compaction-basic` 组装摘要请求时不传 `reasoningEffort`，因此不管界面上选了什么档位，摘要请求都落在 `off` 上。现在 `onlyReasoning` 优先：这类模型不再对外暴露「关闭」档，默认请求不携带 `reasoning_effort`，由插件补上它自己的 `high`，推理通道照常开着。受影响模型：`deepseek-v4.1-flash`、`kimi-k2.8-preview`、`glm-5.3`、`glm-5.3-flash`、`gpt-6-astra`。
+- 测试：新增「always-thinking 行不给 `off`」与压缩请求形状用例，19 文件 / 164 全绿；`tsc` 两个工程与 `tsdown` 构建均干净。
+
+### 致谢
+
+- 感谢 @DreamMoonCai 的 #5：把 `onlyReasoning` 提到 `canDisableThinking` 之前，并补上了压缩路径的用例。这是长期未定位的那批压缩 11133 的根因修法。
+
 ## [1.0.23] - 2026-10-30
 
 ### 修复

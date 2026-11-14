@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.24] - 2026-11-14
+
+### Fixed
+
+- **Every request on a default thinking level failed with `400 code 11133`, and every context compaction failed with it**. Upstream's catalogue ships `deepseek-v4.1-flash` with two contradictory flags at once: `onlyReasoning: true` (the row only ever thinks) and `canDisableThinking: true` (thinking can be turned off). The old lookup trusted the second, so the "off" level was translated into a string `off` that really went on the wire. When no level is selected — the UI's default — pi-ai writes that `off` straight into the request body and the provider rejects it; picking `low` or `high` takes the other branch, which is legal, so only the default path broke. Compaction failing every single time is the same cause, not a second bug: `dsh-compaction-basic` assembles its summarisation call without a `reasoningEffort`, so a summary request lands on `off` whatever level the UI shows. `onlyReasoning` now wins: such rows no longer expose an "off" level, the default request carries no `reasoning_effort`, and the plugin supplies its own `high` so the reasoning channel stays open. Affected rows: `deepseek-v4.1-flash`, `kimi-k2.8-preview`, `glm-5.3`, `glm-5.3-flash`, `gpt-6-astra`.
+- Tests: new cases for "an always-thinking row never gets `off`" and for the compaction request shape; 19 files / 164 green, `tsc` on both projects and `tsdown` clean.
+
+### Thanks
+
+- Thanks to @DreamMoonCai (#5) for putting `onlyReasoning` ahead of `canDisableThinking` and adding the compaction-path cases. This is the root-cause fix for the compaction 11133 batch that went unlocated for so long.
+
 ## [1.0.23] - 2026-10-30
 
 ### Fixed
