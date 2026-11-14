@@ -35,6 +35,18 @@ const onlyReasoningRow = row('deepseek-v4.1-flash', {
   canDisableThinking: false,
 })
 
+/**
+ * The live catalog's shape for `deepseek-v4.1-flash`: a declared set plus both
+ * `onlyReasoning: true` and `canDisableThinking: true`.
+ */
+const switchableOnlyReasoningRow = row('deepseek-v4.1-flash', {
+  supports: true,
+  onlyReasoning: true,
+  supportedEfforts: ['low', 'high', 'max'],
+  defaultEffort: 'high',
+  canDisableThinking: true,
+})
+
 let shim: WorkBuddyShim | undefined
 
 afterEach(async () => {
@@ -43,9 +55,9 @@ afterEach(async () => {
 })
 
 /** Start a shim over `rows` and return the request body it forwarded upstream. */
-async function postChat(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function postChat(body: Record<string, unknown>, rows: WorkBuddyUpstreamModel[] = [onlyReasoningRow]): Promise<Record<string, unknown>> {
   const catalog = new WorkBuddyCatalog({ scope: 'all' })
-  catalog.setUpstream([onlyReasoningRow])
+  catalog.setUpstream(rows)
   let forwarded = ''
   shim = createWorkBuddyShim({
     store: {
@@ -97,6 +109,17 @@ describe('shim reasoning effort fallback', () => {
   it('never overrides an effort pi-ai already selected', async () => {
     const forwarded = await postChat({ ...baseBody, reasoning_effort: 'low' })
     expect(forwarded['reasoning_effort']).toBe('low')
+  })
+
+  // A request that selected no level is what compaction looks like. The shim must
+  // still produce a level the provider accepts — `off` is rejected with 400/11133.
+  // The shim's fixed-effort injection covers this at the payload layer, so this
+  // asserts the injected value rather than the descriptor mapping; the descriptor
+  // itself is covered in tests/reasoning-fields.spec.ts.
+  it('substitutes the declared level for a request that selected none', async () => {
+    const forwarded = await postChat(baseBody, [switchableOnlyReasoningRow])
+    expect(forwarded['reasoning_effort']).not.toBe('off')
+    expect(forwarded['reasoning_effort']).toBe('high')
   })
 
   it('leaves a row without a fixed effort untouched', async () => {
