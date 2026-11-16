@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [1.0.25] - 2026-11-17
+
+### Changed
+
+- **The model catalogue is no longer fetched just once.** It used to be pulled from `GET /v3/config` when the shim became ready and then lived only in memory: a restart emptied it, and rows upstream added or removed were never seen again. The catalogue now persists to `$DSH_HOME/storages/dsh-workbuddy/catalog-{cn,global}.json`, is loaded at boot (so the picker is never empty), and is re-pulled in the background every 24 hours with 0–45 minutes of jitter so refreshes do not land on a fixed grid.
+- The card's refresh button now forces a catalogue re-pull as well as a credit refresh (it used to refresh credits only); `/status` gained `catalog: { fetchedAt, count, newIds }` per region.
+- Rows upstream has just added are labelled "New" until the next catalogue refresh; ids you had disabled that upstream no longer lists are pruned silently on refresh with a log line, instead of lingering as dead switches.
+- Prices stay consistent with the balance: credits refresh only after a successful catalogue pull, so a row can never read "free" while the balance drops.
+- A failed refresh leaves the current catalogue untouched and keeps the last snapshot; unknown upstream fields are ignored leniently rather than breaking the parse.
+- Tests: new `tests/catalog-freshness.spec.ts` (snapshot round-trip, corrupt file, atomic write, jitter range, `newIds` covering one generation only, free scope still containing only `deepseek-v4.1-flash` after a snapshot load) — 20 files / 174 green, `tsc` on both projects and `tsdown` clean.
+
 ## [1.0.24] - 2026-11-14
 
 ### Fixed

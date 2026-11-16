@@ -37,6 +37,13 @@ export interface WorkBuddyStatusRouteOptions {
   regions?: Partial<Record<WorkBuddyRegion, WorkBuddyStatusRegionOptions>>
   refreshPolicy?: () => { activeMinutes: number; inactiveMinutes: number }
   autoCheckin?: () => boolean
+  /**
+   * Re-read both regions' model catalogs. Called before the forced credit read
+   * when the card's 刷新 button asks: a manual refresh that left the model list on
+   * yesterday's rows would answer half the question, so the button means "read the
+   * upstream now", not "read the balance now".
+   */
+  catalogRefresh?: (reason: 'boot' | 'timer' | 'manual') => Promise<void>
   /** The live catalog; the card reads policy, prices, and provenance from it. */
   catalog: WorkBuddyCatalog
   /**
@@ -169,6 +176,11 @@ async function buildRegionStatus(
     scope: options.catalog.currentScope(),
     freeIds: options.catalog.freeIds(),
     priceSource: 'upstream',
+    catalog: {
+      fetchedAt: options.catalog.fetchedAtMs() ?? null,
+      count: options.catalog.knownIds().length,
+      newIds: options.catalog.newIds(),
+    },
     ...options.probe === undefined ? {} : { probe: options.probe() },
     checkin: {
       supported: checkinSupported,
@@ -265,10 +277,15 @@ export function workBuddyAiStatusHandler(
       json(res, 403, { error: 'request-not-trusted' })
       return
     }
-    // `?refresh=1` is the card's 刷新 button: bypass the credit TTL so the figure
-    // the user asked for is read now, not whatever the last background tick cached.
+    // `?refresh=1` is the card's 刷新 button: bypass both TTLs, model rows and
+    // credit, so what the document says is what the upstream said just now. The
+    // catalog read goes first because a credit figure is only meaningful beside the
+    // prices it was billed at.
     const forceCredits = new URL(req.url ?? '/', 'http://127.0.0.1').searchParams.get('refresh') === '1'
     try {
+      if (forceCredits && deps.catalogRefresh !== undefined) {
+        await deps.catalogRefresh('manual')
+      }
       json(res, 200, await workBuddyAiWebStatus(deps, { forceCredits }))
     } catch (error: unknown) {
       json(res, 500, { error: safeMessage(error) })

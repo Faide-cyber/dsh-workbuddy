@@ -79,17 +79,52 @@ export class WorkBuddyCatalog {
    * for the session. Not persisted: availability changes with the plan.
    */
   private unavailable = new Set<string>
+  /**
+   * When the region's rows were last received, epoch ms. Kept here rather than in
+   * the refresh loop because every writer moves it (boot, the 24 h sweep, the
+   * card's 刷新 button, a sign-in, an account switch); a timer holding its own
+   * copy would re-fetch on its own schedule regardless of what actually arrived.
+   */
+  private fetchedAt: number | undefined
+  /**
+   * Ids present in the newest rows but absent from the previous ones.
+   *
+   * Recomputed on every {@link setUpstream}, which is also how the card's "新增"
+   * chips expire: a mark lives exactly one catalog generation. Empty on the first
+   * fetch of a process, so a fresh install does not flag every model as new.
+   */
+  private added: readonly string[] = []
 
   constructor(options: WorkBuddyCatalogOptions = {}) {
     this.scope = options.scope ?? 'free'
   }
 
   /** Replace the upstream rows; the effective list is recomposed immediately. */
-  setUpstream(models: readonly WorkBuddyModelInfo[]): void {
+  setUpstream(models: readonly WorkBuddyModelInfo[], fetchedAtMs: number = Date.now()): void {
+    const seen = new Set(this.upstream.map(model => model.id))
+    this.added = seen.size === 0
+      ? []
+      : models.map(model => model.id).filter(id => !seen.has(id))
     this.upstream = [...models]
+    this.fetchedAt = fetchedAtMs
     // A refresh is the only evidence that availability may have changed (a plan
     // upgrade, a new promo), so forget refusals and let the next request re-teach.
     this.unavailable = new Set()
+  }
+
+  /** When these rows arrived, or `undefined` before the region's first fetch. */
+  fetchedAtMs(): number | undefined {
+    return this.fetchedAt
+  }
+
+  /** Ids that appeared in the newest rows and were absent from the previous ones. */
+  newIds(): readonly string[] {
+    return this.added
+  }
+
+  /** Every id this region currently lists, policy ignored; used to prune switches. */
+  knownIds(): readonly string[] {
+    return this.upstream.map(model => model.id)
   }
 
   /** Record that the upstream refused this model for the signed-in account. */

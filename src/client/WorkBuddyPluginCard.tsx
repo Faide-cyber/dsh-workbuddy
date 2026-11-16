@@ -347,9 +347,11 @@ function ModelRow(props: {
   model: WorkBuddyWebModelBadge
   t: WorkBuddyPluginCardInjected['t']
   disabled: boolean
+  /** Listed in the newest catalog but absent from the previous one. */
+  isNew: boolean
   onToggle: (enabled: boolean) => void
 }): ReactElement {
-  const { model, t, disabled, onToggle } = props
+  const { model, t, disabled, isNew, onToggle } = props
   return (
     <li style={modelRowStyle}>
       <div style={{ display: 'flex', minWidth: 0, flexDirection: 'column', gap: 2 }}>
@@ -363,6 +365,7 @@ function ModelRow(props: {
         {(model.badges ?? []).map(badge => (
           <span key={badge} style={chipStyle}>{modelBadgeLabel(badge, t)}</span>
         ))}
+        {isNew ? <span style={chipStyle}>{t('modelNew')}</span> : null}
         {model.free === true
           ? <span style={chipStyle}>{t('freeModel')}</span>
           : <span style={mutedChipStyle}>{t('scopePaid')}</span>}
@@ -459,6 +462,9 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
   const scope: WorkBuddyModelScope = signedIn ? (activeRegion?.scope ?? 'free') : 'free'
   const probe = signedIn ? activeRegion?.probe : undefined
   const models = signedIn ? (activeRegion?.models ?? []) : []
+  // One generation only: the host clears these on the next catalog read, so a chip
+  // cannot outlive the refresh that produced it.
+  const newModelIds = useMemo(() => new Set(activeRegion?.catalog?.newIds ?? []), [activeRegion?.catalog?.newIds])
   const priceSource = activeRegion?.priceSource
   const autoCheckinEnabled = cardRegion === 'cn' ? activeRegion?.checkin?.enabled === true : signedInStatus?.autoCheckin === true
 
@@ -1092,6 +1098,7 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                                         model={model}
                                         t={t}
                                         disabled={busy || controlKey === undefined}
+                                        isNew={newModelIds.has(model.id)}
                                         onToggle={enabled => { onModelToggle(model.id, enabled) }}
                                       />
                                     ))}

@@ -86,6 +86,7 @@ Settings → Plugins → **DSH WorkBuddy**:
 - Domestic/international account lists, official edition badges, explicit switching, remaining credits, and a connectivity test
 - Tick domestic personal accounts for auto check-in (off by default); education accounts do not expose check-in controls
 - The active account refreshes read-only every 15 minutes and others every 60 minutes by default — configurable
+- The model catalogue and its prices are re-pulled from upstream every 24 hours (jittered); rows upstream has just added show up labelled "New", and the refresh button re-pulls the catalogue as well as the credits
 - **Free models only** (default) / **All models**
 
 Or configure it in the profile's `cordis.patch.yml`:

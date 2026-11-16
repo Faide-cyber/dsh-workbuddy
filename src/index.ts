@@ -24,6 +24,7 @@ import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-attachment'
 import { WorkBuddyAccountStore, type WorkBuddyCredential } from './auth.ts'
 import { WorkBuddyCatalog, type WorkBuddyModelScope } from './catalog.ts'
+import { catalogRefreshDue, drawCatalogJitter, readCatalogSnapshot, writeCatalogSnapshot } from './catalog-cache.ts'
 import { applyModelSwitchWrite } from './model-switches.ts'
 import { createWorkBuddyAdapter, declaredFixedEffort, WORKBUDDY_CN_DISPLAY_NAME, WORKBUDDY_CN_PROVIDER, WORKBUDDY_DISPLAY_NAME, WORKBUDDY_PROVIDER } from './adapter.ts'
 import { createWorkBuddyShim } from './shim.ts'
@@ -268,6 +269,15 @@ export function apply(ctx: Context, config: Config): void {
   cnStore.setDesktopPath(current().cnAuthFile)
   catalog.setDisabled(current().disabledModels ?? [])
   cnCatalog.setDisabled(current().cnDisabledModels ?? [])
+  // Seed from the last snapshot before the network is touched. A restart must not
+  // greet the picker with an empty catalog, and the persisted `fetchedAt` is what
+  // keeps repeated restarts from turning into repeated upstream reads.
+  for (const [region, target] of [['global', catalog], ['cn', cnCatalog]] as const) {
+    const snapshot = readCatalogSnapshot(region)
+    if (snapshot !== undefined) target.setUpstream(snapshot.models, snapshot.fetchedAtMs)
+  }
+  /** This process's share of the refresh jitter; drawn once so every region agrees. */
+  const catalogJitterMs = drawCatalogJitter()
   const shim = createWorkBuddyShim({ store, client, catalog, logger: ctx.logger, onModelUnavailable: () => refreshModels() })
   const cnShim = createWorkBuddyShim({ store: cnStore, client, catalog: cnCatalog, logger: ctx.logger, onModelUnavailable: () => refreshModels() })
   /**
@@ -284,12 +294,12 @@ export function apply(ctx: Context, config: Config): void {
     inactiveMinutes: Math.max(1, current().refreshInactiveMinutes ?? 60),
   })
   const autoCheckin = (): boolean => current().autoCheckin === true
-  const refreshCredits = async (): Promise<void> => {
+  const refreshCredits = async (force = false): Promise<void> => {
     const policy = refreshPolicy()
     const fetch = (credential: Parameters<typeof client.fetchCredits>[0]) => client.fetchCredits(credential)
     await Promise.all([
-      store.refreshCreditSnapshots(fetch, policy.activeMinutes * 60_000, policy.inactiveMinutes * 60_000),
-      cnStore.refreshCreditSnapshots(fetch, policy.activeMinutes * 60_000, policy.inactiveMinutes * 60_000),
+      store.refreshCreditSnapshots(fetch, policy.activeMinutes * 60_000, policy.inactiveMinutes * 60_000, { force }),
+      cnStore.refreshCreditSnapshots(fetch, policy.activeMinutes * 60_000, policy.inactiveMinutes * 60_000, { force }),
     ])
   }
 
@@ -352,6 +362,12 @@ export function apply(ctx: Context, config: Config): void {
   // service is optional (a headless profile serves no browser).
   const controlKey = createControlKey()
   let refreshModels = () => {}
+  /**
+   * Re-read both regions' catalogs. Assigned once the shims hold their ports, so
+   * every caller here (the daily sweep, the card's 刷新 button) has a no-op to hit
+   * rather than a `undefined` to check before the plugin is fully up.
+   */
+  let refreshCatalogNow: (reason: 'boot' | 'timer' | 'manual') => Promise<void> = async () => {}
   /**
    * The provider rows this plugin offers, one per region. Undefined until the
    * loopback endpoint is up; the row appears on sign-in and leaves on sign-out,
@@ -695,6 +711,7 @@ export function apply(ctx: Context, config: Config): void {
       },
       refreshPolicy,
       autoCheckin,
+      catalogRefresh: reason => refreshCatalogNow(reason),
       probe: () => probeSection(),
       controlKey,
       allowedHosts: () => current().allowedHosts ?? [],
@@ -850,6 +867,15 @@ export function apply(ctx: Context, config: Config): void {
     void refreshCredits()
     void runAutoCheckin()
     void refreshCheckinStates()
+    // Catalog freshness rides this tick instead of a timer of its own: one place
+    // that decides "is it due", one place to reason about when we next touch the
+    // upstream. `catalogRefreshDue` reads the newest arrival from either region, so
+    // a manual refresh and the snapshot restored at boot both count.
+    const newest = [catalog.fetchedAtMs(), cnCatalog.fetchedAtMs()]
+      .filter((value): value is number => value !== undefined)
+    if (newest.length === 0 || newest.some(fetchedAt => catalogRefreshDue(fetchedAt, Date.now(), catalogJitterMs))) {
+      void refreshCatalogNow('timer')
+    }
   }, 300_000)
   void refreshCredits()
   void refreshCheckinStates()
@@ -929,27 +955,66 @@ export function apply(ctx: Context, config: Config): void {
         return
       }
 
-      void (async () => {
-        for (const [targetStore, targetClient, targetCatalog] of [
-          [store, client, catalog],
-          [cnStore, client, cnCatalog],
+      /**
+       * Re-read both regions' catalogs and act on what changed.
+       *
+       * The daily sweep and the card's 刷新 button both land here, so every
+       * post-fetch consequence lives in one place: the freshness stamp, the
+       * snapshot, picker invalidation, a forced credit read (a stale price beside
+       * a live balance is the one combination that must never render), and
+       * pruning switches whose model the upstream no longer lists.
+       */
+      const pruneDisabledModels = (): void => {
+        for (const [region, target] of [['global', catalog], ['cn', cnCatalog]] as const) {
+          const known = new Set(target.knownIds())
+          // An empty catalog means "not fetched yet", not "everything withdrawn".
+          if (known.size === 0) continue
+          const stale = target.disabledIds().filter(id => !known.has(id))
+          if (stale.length === 0) continue
+          target.setDisabled(target.disabledIds().filter(id => known.has(id)))
+          ctx.logger.info('dsh-workbuddy: pruned disabled models the upstream no longer lists', stale)
+          try {
+            const ids = [...target.disabledIds()]
+            persistConfigPatch(region === 'cn' ? { cnDisabledModels: ids } : { disabledModels: ids })
+          } catch (error: unknown) {
+            ctx.logger.warn('dsh-workbuddy: failed to persist the pruned model switches', error)
+          }
+        }
+      }
+
+      refreshCatalogNow = async reason => {
+        if (stopped) return
+        let changed = false
+        for (const [region, targetStore, targetCatalog] of [
+          ['global', store, catalog],
+          ['cn', cnStore, cnCatalog],
         ] as const) {
           try {
             const credential = await targetStore.current()
             if (credential === undefined || stopped) continue
-            const models = await targetClient.fetchModels(credential)
+            const models = await client.fetchModels(credential)
             if (stopped) return
-            targetCatalog.setUpstream(models)
+            const fetchedAtMs = Date.now()
+            targetCatalog.setUpstream(models, fetchedAtMs)
+            try {
+              writeCatalogSnapshot(region, { fetchedAtMs, models })
+            } catch (error: unknown) {
+              ctx.logger.warn('dsh-workbuddy: failed to persist the model catalog snapshot', error)
+            }
+            changed = true
           } catch (error: unknown) {
             ctx.logger.warn(
-              'dsh-workbuddy: dynamic model catalog unavailable; serving the static fallback list',
+              `dsh-workbuddy: model catalog refresh (${reason}) failed; keeping the last known rows`,
               error,
             )
           }
         }
-        invalidateGlobal?.()
-        invalidateCn?.()
-      })()
+        if (!changed) return
+        pruneDisabledModels()
+        refreshModels()
+        await refreshCredits(true)
+      }
+      void refreshCatalogNow('boot')
     })
     .catch((error: unknown) => {
       ctx.logger.error('dsh-workbuddy: loopback endpoint failed to start; provider not registered', error)

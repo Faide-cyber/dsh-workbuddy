@@ -34,7 +34,7 @@ afterEach(async () => {
  * back the cached figure — the button looked like a no-op for up to 15 minutes.
  * `?refresh=1` is now the difference between the two callers.
  */
-async function mountStatusRoute(): Promise<{ url: string; reads: () => number }> {
+async function mountStatusRoute(): Promise<{ url: string; reads: () => number; catalogCalls: string[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-workbuddy-ai-status-'))
   cleanup.push(dir)
   const store = new WorkBuddyAccountStore({
@@ -62,6 +62,7 @@ async function mountStatusRoute(): Promise<{ url: string; reads: () => number }>
     fetchAccountEdition: async (): Promise<undefined> => undefined,
   }
   const catalog = new WorkBuddyCatalog({ scope: 'free' })
+  const catalogCalls: string[] = []
   server = createServer(workBuddyAiStatusHandler({
     // A credentialed top-level store would add one *uncached* upstream read per
     // request, drowning the regional cache behaviour this test is about. Signing
@@ -78,11 +79,12 @@ async function mountStatusRoute(): Promise<{ url: string; reads: () => number }>
     regions: { cn: { region: 'cn', store, client, catalog } },
     // A long TTL is the point: every poll inside it must be served from cache.
     refreshPolicy: () => ({ activeMinutes: 15, inactiveMinutes: 60 }),
+    catalogRefresh: async reason => { catalogCalls.push(reason) },
   }))
   await new Promise<void>(resolve => { server!.listen(0, '127.0.0.1', resolve) })
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('no port')
-  return { url: `http://127.0.0.1:${address.port}/plugins/dsh-workbuddy/status`, reads: () => reads }
+  return { url: `http://127.0.0.1:${address.port}/plugins/dsh-workbuddy/status`, reads: () => reads, catalogCalls }
 }
 
 function creditsOf(document: unknown): number | undefined {
@@ -120,5 +122,20 @@ describe('status route credit freshness', () => {
     // And a plain poll after a forced read is still served from the fresh cache.
     await (await fetch(url)).json()
     expect(reads()).toBe(afterForcedAgain)
+  })
+})
+
+describe('status route catalog freshness', () => {
+  it('re-reads the catalog only when the card asks, and dates the rows it returns', async () => {
+    const { url, catalogCalls } = await mountStatusRoute()
+
+    // The poll must stay a read: a background catalog fetch every 60 seconds is
+    // precisely the traffic the 24-hour sweep exists to avoid.
+    const polled = await (await fetch(url)).json() as { regions?: { catalog?: { fetchedAt: number | null; count: number; newIds: string[] } }[] }
+    expect(catalogCalls).toEqual([])
+    expect(polled.regions?.[0]?.catalog).toEqual({ fetchedAt: null, count: 0, newIds: [] })
+
+    await (await fetch(`${url}?refresh=1`)).json()
+    expect(catalogCalls).toEqual(['manual'])
   })
 })

@@ -89,6 +89,15 @@ interface WorkBuddyWebModelBadge {
  * means paid models become selectable and their credit cost is real.
  */
 type WorkBuddyModelScope$1 = 'free' | 'all';
+/** Provenance of one region's model rows, so the card can date what it shows. */
+interface WorkBuddyWebCatalog {
+  /** When these rows arrived, epoch ms; `null` before the region's first read. */
+  fetchedAt: number | null;
+  /** How many rows the upstream returned, policy ignored. */
+  count: number;
+  /** Ids that appeared since the previous read; the card marks them as new. */
+  newIds: readonly string[];
+}
 /** A token-free account row shown in the region tab. */
 interface WorkBuddyWebAccount {
   id: string;
@@ -148,6 +157,8 @@ interface WorkBuddyWebRegion {
   scope?: WorkBuddyModelScope$1;
   freeIds?: readonly string[];
   priceSource?: 'upstream';
+  /** Where the model rows came from in time, and which of them are new. */
+  catalog?: WorkBuddyWebCatalog;
   checkin?: WorkBuddyWebCheckin;
 }
 /** The JSON document the plugin card renders. */
@@ -887,9 +898,30 @@ declare class WorkBuddyCatalog {
    * for the session. Not persisted: availability changes with the plan.
    */
   private unavailable;
+  /**
+   * When the region's rows were last received, epoch ms. Kept here rather than in
+   * the refresh loop because every writer moves it (boot, the 24 h sweep, the
+   * card's 刷新 button, a sign-in, an account switch); a timer holding its own
+   * copy would re-fetch on its own schedule regardless of what actually arrived.
+   */
+  private fetchedAt;
+  /**
+   * Ids present in the newest rows but absent from the previous ones.
+   *
+   * Recomputed on every {@link setUpstream}, which is also how the card's "新增"
+   * chips expire: a mark lives exactly one catalog generation. Empty on the first
+   * fetch of a process, so a fresh install does not flag every model as new.
+   */
+  private added;
   constructor(options?: WorkBuddyCatalogOptions);
   /** Replace the upstream rows; the effective list is recomposed immediately. */
-  setUpstream(models: readonly WorkBuddyModelInfo[]): void;
+  setUpstream(models: readonly WorkBuddyModelInfo[], fetchedAtMs?: number): void;
+  /** When these rows arrived, or `undefined` before the region's first fetch. */
+  fetchedAtMs(): number | undefined;
+  /** Ids that appeared in the newest rows and were absent from the previous ones. */
+  newIds(): readonly string[];
+  /** Every id this region currently lists, policy ignored; used to prune switches. */
+  knownIds(): readonly string[];
   /** Record that the upstream refused this model for the signed-in account. */
   markUnavailable(id: string): void;
   /** Whether a previous request was refused for this account. */

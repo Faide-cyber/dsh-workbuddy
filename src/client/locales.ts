@@ -98,6 +98,7 @@ export const en = {
   scopeActive: 'Active',
   scopePaid: 'Paid',
   scopeHidden: 'Hidden by the free-only filter',
+  modelNew: 'New',
 
   modelsHeading: 'Models',
   modelsIntro: 'Rates come from the selected region’s WorkBuddy catalog; domestic and international prices are independent.',
@@ -231,6 +232,7 @@ export const zh: Record<WorkBuddySettingsKey, string> = {
   scopeActive: '当前生效',
   scopePaid: '付费',
   scopeHidden: '被「仅免费」过滤',
+  modelNew: '新增',
 
   modelsHeading: '模型',
   modelsIntro: '倍率来自当前区域的 WorkBuddy 模型目录；国内版与国际版价格彼此独立。',

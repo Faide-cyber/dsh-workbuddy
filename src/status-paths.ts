@@ -95,6 +95,16 @@ export interface WorkBuddyWebModelBadge {
  */
 export type WorkBuddyModelScope = 'free' | 'all'
 
+/** Provenance of one region's model rows, so the card can date what it shows. */
+export interface WorkBuddyWebCatalog {
+  /** When these rows arrived, epoch ms; `null` before the region's first read. */
+  fetchedAt: number | null
+  /** How many rows the upstream returned, policy ignored. */
+  count: number
+  /** Ids that appeared since the previous read; the card marks them as new. */
+  newIds: readonly string[]
+}
+
 /** A token-free account row shown in the region tab. */
 export interface WorkBuddyWebAccount {
   id: string
@@ -139,6 +149,8 @@ export interface WorkBuddyWebRegion {
   scope?: WorkBuddyModelScope
   freeIds?: readonly string[]
   priceSource?: 'upstream'
+  /** Where the model rows came from in time, and which of them are new. */
+  catalog?: WorkBuddyWebCatalog
   checkin?: WorkBuddyWebCheckin
 }
 
