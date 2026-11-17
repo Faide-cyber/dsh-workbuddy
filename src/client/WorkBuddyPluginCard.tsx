@@ -455,6 +455,10 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
   // top level. The top level is the global account, so a cn tab that fell back
   // to it showed the global model list and global credits next to cn accounts.
   const signedIn = activeRegion?.signedIn === true
+  // A desktop build that encrypts its token fields leaves this card signed out
+  // while the desktop app is signed in; naming the envelope is the only way the
+  // difference between the two is visible.
+  const desktopEncryptedFields = activeRegion?.desktopEncryptedFields ?? []
   const controlKey = status !== undefined && status.status !== 'error' ? status.controlKey : undefined
   const scope: WorkBuddyModelScope = signedIn ? (activeRegion?.scope ?? 'free') : 'free'
   const probe = signedIn ? activeRegion?.probe : undefined
@@ -744,6 +748,9 @@ export function WorkBuddyPluginCard(props: WorkBuddyPluginCardProps): ReactEleme
                     </span>
                   </div>
                   <p style={bodyStyle}>{t('signedOutHint')}</p>
+                  {desktopEncryptedFields.length === 0
+                    ? null
+                    : <p style={bodyStyle}>{t('desktopEncryptedHint', { fields: desktopEncryptedFields.join(', ') })}</p>}
                 </div>
               )
               : null}

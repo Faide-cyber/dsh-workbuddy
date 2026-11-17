@@ -131,6 +131,7 @@ dsh plugin --profile web exec dsh-workbuddy logout
 | 局域网 IP 打开卡片 403 `request-not-trusted` | 在 `allowedHosts` 里写该 IP/主机名，不要把它加进回环名单 |
 | 登录成功但没有模型 | 该区域目录请求失败或返回为空——检查网络与 token 是否仍有效；此时列表保持为空，不会借用另一区域的模型 |
 | `doctor` 显示 signed-out | 先 `login`，或确认国际版桌面 App 已登录 |
+| `doctor` 里出现 `desktopAuthFile.encryptedFields` | 该桌面端版本把 token 字段封进 `$wbEncrypted` 信封，解封密钥只在桌面端进程内存里，只读导入在这里拿不到凭据。请用卡片上的「连接」登录 |
 | 想用付费模型 | 设置卡片把范围改成「全部模型」，注意会扣积分 |
 | 国内版每个请求都 400 `code 11128` | 国内网关按**字面连续子串**匹配 DSH 自己提示词里的原文：最初是身份横幅 `DeepSeek Harness`，2026-10-27 起扩大到其他段落，实测最小触发串是 112 字符、顺序敏感、确定性的 `Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve to the workspace root`（出自 `@deepseek-ai/dsh-file-reference`）。插件转发前做两层处理，都无需设置：**语义层**把已登记的原文改写成同义句（国际/国内两个区都生效；无命中时逐字节不动，不破坏前缀缓存）；**结构层**两个区都跑，把过长的连续片段用换行打断——空格处换成换行，中文段落则在词句边界**插入**换行且不在行首留标点。这样长度 ≥40 的含空格片段不再存在；**无空格的长 ASCII 串**（URL、base64、`a/b/c` 这类斜杠串）打不断，属已知上限。网关只扫 `system` 与 `assistant`，不扫 `user`/`tool`，所以这两类不做改动。若你绕过插件，或上游再收紧，可在 `cordis.patch.yml` 给 `@deepseek-ai/dsh-system-prompt` 设 `includeHarnessIdentity: false` |
 | 国际版每个请求都 400 `code 11128` | 两种成因，看 `msg`：`request illegal` 是缺 `X-Conversation-ID`、`X-Conversation-Request-ID`、`X-Conversation-Message-ID`（1.0.15 起自动补齐）；`Illegal API invocation from an unapproved channel` 是内容级字面指纹（2026-10-30 起国际网关也启用），1.0.23 起与国内走同一套两层处理，无需设置。 |

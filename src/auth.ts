@@ -241,6 +241,58 @@ function parseAuthDocument(text: string): { document: Record<string, unknown>; a
   return { document, auth, identity }
 }
 
+/** Envelope marker a field-level-encrypted desktop build wraps a value in. */
+export const ENCRYPTED_AUTH_FIELD = '$wbEncrypted'
+
+function isEncryptedFieldValue(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  return (value as Record<string, unknown>)[ENCRYPTED_AUTH_FIELD] === 1
+}
+
+/** Dotted names of the encrypted values in one section of the document. */
+function encryptedFieldsOf(section: string, record: Record<string, unknown>): string[] {
+  const found: string[] = []
+  for (const [key, value] of Object.entries(record)) {
+    if (isEncryptedFieldValue(value)) found.push(section === '' ? key : `${section}.${key}`)
+  }
+  return found
+}
+
+/**
+ * Which fields of a desktop auth document sit inside a `$wbEncrypted` envelope.
+ *
+ * Recent desktop builds encrypt the token-bearing fields one by one. The
+ * envelope names an AES key that exists only in the desktop process's memory, so
+ * this module cannot open it and does not try: an import of such a file yields
+ * no credential, and the caller has to say that out loud instead of reporting a
+ * plain "signed out". The plaintext fields stay readable, which is enough to
+ * name the account the desktop app is holding.
+ */
+export function encryptedWorkBuddyAuthFields(text: string): readonly string[] {
+  const parsed = parseAuthDocument(text)
+  if (parsed === undefined) return []
+  const { document, auth, identity } = parsed
+  // The flat document form has no sections, so every field gets its bare name;
+  // prefixing it `auth.` would invent a nesting the file does not have.
+  if (auth === document) return encryptedFieldsOf('', document)
+  return [
+    ...encryptedFieldsOf('auth', auth),
+    ...encryptedFieldsOf('account', identity),
+  ]
+}
+
+/** Encrypted fields in the first candidate file that exists; empty when none does. */
+async function readEncryptedFields(candidates: readonly string[]): Promise<readonly string[]> {
+  for (const candidate of candidates) {
+    try {
+      return encryptedWorkBuddyAuthFields(await readFile(candidate, 'utf8'))
+    } catch (error: unknown) {
+      if (!isENOENT(error)) return []
+    }
+  }
+  return []
+}
+
 export interface WorkBuddyAuthIdentity {
   uid?: string
   edition?: WorkBuddyAccountEdition
@@ -626,6 +678,14 @@ export class WorkBuddyCredentialStore implements WorkBuddyCredentialStoreLike {
     }
     return false
   }
+
+  /**
+   * Encrypted fields in the desktop file, for diagnostics: a non-empty answer
+   * explains a signed-out state that has a signed-in desktop app behind it.
+   */
+  async desktopEncryptedFields(): Promise<readonly string[]> {
+    return readEncryptedFields(this.resolveDesktopCandidates())
+  }
 }
 
 /** Token-free account row exposed to the settings card. */
@@ -756,6 +816,11 @@ export class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
   desktopAuthPath(): string | undefined { return this.desktopCandidates()[0] }
   ownAuthPath(): string { return this.accountOwnPath }
   accountsAuthPath(): string { return this.accountsPath }
+
+  /** Encrypted fields in this region's desktop file; see {@link encryptedWorkBuddyAuthFields}. */
+  async desktopEncryptedFields(): Promise<readonly string[]> {
+    return readEncryptedFields(this.desktopCandidates())
+  }
 
   private async readAccounts(): Promise<AccountRecord[]> {
     if (this.records !== undefined) return this.records
