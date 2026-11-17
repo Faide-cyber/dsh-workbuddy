@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **New desktop builds wrap each token field in a `$wbEncrypted` envelope, and the read-only import failed silently: the card said "Not signed in" with no reason.** `parseWorkBuddyAuth` only returned a credential when `accessToken` was a string, so an envelope object fell through to `undefined` and every caller took the same branch as "nobody is signed in". `encryptedWorkBuddyAuthFields()` now names the sealed fields (`auth.accessToken`, `auth.refreshToken`, …); `doctor` prints them under `desktopAuthFile.encryptedFields` with an explanation, and the card lists them in the signed-out region next to Connect. Decryption stays out of scope: the envelope names an AES key that exists only in the desktop process's memory, and reading another process's memory is not part of this plugin.
+- Tests: new cases for envelope detection and `desktopEncryptedFields()`, 19 files / 166 green; `tsc` on both projects and `tsdown` clean.
+
 ## [1.0.24] - 2026-11-14
 
 ### Fixed
