@@ -51,6 +51,11 @@ export const WORKBUDDY_STREAM_IDLE_TIMEOUT_MS = 300_000
  */
 const MAX_REQUEST_IMAGE_BYTES = 20_971_520
 
+/** dsh-llm-pi-ai defaults required by the hand-assembled profile. */
+const MAX_REQUEST_IMAGES = 50
+const IMAGE_OFFLOAD_COUNT_QUANTUM = 10
+const REQUEST_IMAGE_BUDGET_COUNT = 20
+
 /**
  * Inert pi-ai ambient auth.
  *
@@ -223,6 +228,19 @@ function toPiModel(
   } as unknown as Model<Api>
 }
 
+/** Mirror dsh-llm-pi-ai's per-image budget calculation for regression tests. */
+export function requestImageByteBudget(profile: {
+  maxRequestImageBytes?: number | undefined
+  requestImageBudgetCount?: number | undefined
+  requestImageMaxBytes?: number | undefined
+  maxImageBytes?: number | undefined
+}): number {
+  const allocatedBytes = Math.floor(
+    (profile.maxRequestImageBytes as number) / (profile.requestImageBudgetCount as number) / 4,
+  ) * 3
+  return Math.min(allocatedBytes, profile.requestImageMaxBytes ?? profile.maxImageBytes ?? 1_048_576)
+}
+
 /**
  * Assemble the adapter.
  *
@@ -277,6 +295,9 @@ export function createWorkBuddyAdapter(options: WorkBuddyAdapterOptions): WorkBu
     retryPolicy: resolveRetryPolicy(undefined, 'dsh-workbuddy retryPolicy'),
     configuredMaxTokens: new Map(),
     maxRequestImageBytes: MAX_REQUEST_IMAGE_BYTES,
+    maxRequestImages: MAX_REQUEST_IMAGES,
+    imageOffloadCountQuantum: IMAGE_OFFLOAD_COUNT_QUANTUM,
+    requestImageBudgetCount: REQUEST_IMAGE_BUDGET_COUNT,
     piProvider: provider,
     modelErrors: new Map<string, string>(),
     requestImagePixelBudget: 4_194_304,
