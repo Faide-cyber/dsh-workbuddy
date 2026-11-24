@@ -2,6 +2,14 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 修复
+
+- **DSH 0.2.3+ 上带图请求整条会话报废：`Image request maxImageBytes must be a positive integer.`（`INVALID_ATTACHMENT_REF`）**。DSH 0.2.3 的 `ResolvedPiAiProviderProfile` 把 `requestImageBudgetCount` 列为必需字段，插件手工拼装的 profile 里没有它。`dsh-llm-pi-ai` 的 `resolveImageRequestBudget()` 用 `floor(maxRequestImageBytes / requestImageBudgetCount / 4) * 3` 分配每张图的字节预算，除数缺失让结果是 `NaN`；`Math.min(NaN, 1 MiB)` 仍是 `NaN`；上游自己的 `maxImageBytes < 1` 守卫也拦不住，因为任何与 `NaN` 的比较都是 `false`。检查发生在附件存储的 `validateTarget()` 里，早于模型调用，所以只要会话历史里有一张图，每一轮都失败——重试、回滚一轮再问都同样报错。现在补上 `requestImageBudgetCount: 20`，并按 `ResolvedPiAiProviderProfile` 显式列出同样被漏掉的 `maxRequestImages: 50` 与 `imageOffloadCountQuantum: 10`。
+- 为什么类型检查没挡住：仓库仍对着 `dsh-llm-pi-ai@0.2.0-rc.2` 的类型做 `tsc`，那一版还没有这几个字段，而 profile 用 `as ResolvedPiAiProviderProfile` 断言，编译器无从发现。新增 `tests/adapter-image-budget.spec.ts` 从运行时把这条算式钉住：正确 profile 得到正的 safe integer（786 432），缺除数则得到 `NaN` 且 `NaN < 1` 为 `false`（正是它溜过守卫的原因）。
+- 影响面：20 MiB 的请求级图片预算与 1 MiB 的每图上限都不变；补齐的三个字段取的都是 `dsh-llm-pi-ai` 的默认值，非图片请求完全不受影响。
+
 ## [1.0.24] - 2026-11-14
 
 ### 修复

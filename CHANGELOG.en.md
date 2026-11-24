@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **On DSH 0.2.3+ any request carrying an image killed the whole conversation with `Image request maxImageBytes must be a positive integer.` (`INVALID_ATTACHMENT_REF`)**. DSH 0.2.3 made `requestImageBudgetCount` a required field of `ResolvedPiAiProviderProfile`; this plugin hand-assembles its profile and never set it. `dsh-llm-pi-ai`'s `resolveImageRequestBudget()` allocates the per-image byte budget as `floor(maxRequestImageBytes / requestImageBudgetCount / 4) * 3`, so the missing divisor made the result `NaN`; `Math.min(NaN, 1 MiB)` stays `NaN`; and the host's own `maxImageBytes < 1` guard let it through, because every comparison against `NaN` is `false`. The check runs inside the attachment store's `validateTarget()`, before the model is called, so one image anywhere in the history failed every turn — retrying and rewinding a turn both failed identically. `requestImageBudgetCount: 20` is now set, together with `maxRequestImages: 50` and `imageOffloadCountQuantum: 10`, which the same interface requires and which were also missing.
+- Why typecheck did not catch it: the repo still compiles against `dsh-llm-pi-ai@0.2.0-rc.2`, whose type has none of these fields, and the profile is asserted with `as ResolvedPiAiProviderProfile`, so the compiler had nothing to check. `tests/adapter-image-budget.spec.ts` now pins the arithmetic at runtime: a correct profile yields a positive safe integer (786 432), while a missing divisor yields `NaN` and `NaN < 1` is `false` — which is exactly how it slipped past the guard.
+- Impact: the 20 MiB request-wide budget and the 1 MiB per-image cap are unchanged; all three added fields take `dsh-llm-pi-ai` defaults, so text-only requests are unaffected.
+
 ## [1.0.24] - 2026-11-14
 
 ### Fixed

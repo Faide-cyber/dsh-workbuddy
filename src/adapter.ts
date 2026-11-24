@@ -52,6 +52,30 @@ export const WORKBUDDY_STREAM_IDLE_TIMEOUT_MS = 300_000
 const MAX_REQUEST_IMAGE_BYTES = 20_971_520
 
 /**
+ * Maximum retained image occurrences per request, and the oldest-occurrence
+ * step used when that count overflows. Both are dsh-llm-pi-ai defaults; they
+ * are restated here because this profile is hand-assembled.
+ */
+const MAX_REQUEST_IMAGES = 50
+const IMAGE_OFFLOAD_COUNT_QUANTUM = 10
+
+/**
+ * Fixed divisor of {@link MAX_REQUEST_IMAGE_BYTES} when allocating the hard
+ * per-image budget, at the dsh-llm-pi-ai default.
+ *
+ * This one is load-bearing: `resolveImageRequestBudget()` divides
+ * `maxRequestImageBytes` by it and passes the quotient to
+ * `Math.min(allocatedBytes, ...)`. When the field is absent the quotient is
+ * `NaN`, `Math.min(NaN, 1 MiB)` stays `NaN`, and the adapter's own
+ * `maxImageBytes < 1` guard lets `NaN` through because every comparison against
+ * `NaN` is false. The attachment store then rejects the request inside
+ * `validateTarget()` with `Image request maxImageBytes must be a positive
+ * integer.` before the model is called, so every image-bearing request fails
+ * and one image left in the history wedges the whole conversation.
+ */
+const REQUEST_IMAGE_BUDGET_COUNT = 20
+
+/**
  * Inert pi-ai ambient auth.
  *
  * The route authenticates only through the shim shared secret resolved per
@@ -224,6 +248,30 @@ function toPiModel(
 }
 
 /**
+ * Resolve the per-image byte budget the way `dsh-llm-pi-ai` does, so the value
+ * this route hands the attachment store can be asserted without a live model
+ * call.
+ *
+ * Kept as a mirror of the upstream formula rather than a refactor of it: the
+ * formula is internal to dsh-llm-pi-ai, and the point of the test is to notice
+ * when a hand-assembled profile stops satisfying it.
+ *
+ * @returns the hard per-image encoded-byte cap, or `NaN` when the profile omits
+ *   a divisor the upstream formula requires.
+ */
+export function requestImageByteBudget(profile: {
+  maxRequestImageBytes?: number | undefined
+  requestImageBudgetCount?: number | undefined
+  requestImageMaxBytes?: number | undefined
+  maxImageBytes?: number | undefined
+}): number {
+  const allocatedBytes = Math.floor(
+    (profile.maxRequestImageBytes as number) / (profile.requestImageBudgetCount as number) / 4,
+  ) * 3
+  return Math.min(allocatedBytes, profile.requestImageMaxBytes ?? profile.maxImageBytes ?? 1_048_576)
+}
+
+/**
  * Assemble the adapter.
  *
  * The provider's `getModels` reads the live catalog, and every model's `baseUrl`
@@ -270,6 +318,15 @@ export function createWorkBuddyAdapter(options: WorkBuddyAdapterOptions): WorkBu
 
   // Extra fields are required at runtime by dsh-llm-pi-ai 0.1.5 (`modelErrors.get`)
   // and ignored by 0.1.0. Cast so both type lines accept the same object.
+  //
+  // The cast erases the compiler's help, so every field a newer
+  // `ResolvedPiAiProviderProfile` marks required must be listed here by hand.
+  // `requestImageBudgetCount` is the cautionary case: DSH 0.2.3 began requiring
+  // it while this repo still type-checks against 0.2.0-rc.2's older shape, so its
+  // absence compiled fine and only failed at runtime — every image-bearing
+  // request died inside the attachment store with `Image request maxImageBytes
+  // must be a positive integer.` tests/adapter-image-budget.spec.ts pins the
+  // field so the gap cannot reopen silently.
   const profile = {
     provider: providerId,
     displayName: providerName,
@@ -277,6 +334,9 @@ export function createWorkBuddyAdapter(options: WorkBuddyAdapterOptions): WorkBu
     retryPolicy: resolveRetryPolicy(undefined, 'dsh-workbuddy retryPolicy'),
     configuredMaxTokens: new Map(),
     maxRequestImageBytes: MAX_REQUEST_IMAGE_BYTES,
+    maxRequestImages: MAX_REQUEST_IMAGES,
+    imageOffloadCountQuantum: IMAGE_OFFLOAD_COUNT_QUANTUM,
+    requestImageBudgetCount: REQUEST_IMAGE_BUDGET_COUNT,
     piProvider: provider,
     modelErrors: new Map<string, string>(),
     requestImagePixelBudget: 4_194_304,
