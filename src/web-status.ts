@@ -167,11 +167,13 @@ async function buildRegionStatus(
   const selectedAccountId = options.store.selectedId()
   const selectedAccount = accounts.find(account => account.id === selectedAccountId)
   const checkinSupported = options.region === 'cn' && selectedAccount?.edition !== 'education'
+  const encryptedFields = await options.store.desktopEncryptedFields()
   return {
     region: options.region,
     signedIn: accounts.length > 0,
     ...selectedAccountId === undefined ? {} : { selectedAccountId },
     accounts,
+    ...encryptedFields.length === 0 ? {} : { desktopEncryptedFields: encryptedFields },
     ...options.catalog.all().length === 0 ? {} : { models: modelBadges(options.catalog) },
     scope: options.catalog.currentScope(),
     freeIds: options.catalog.freeIds(),

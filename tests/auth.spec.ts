@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { parseWorkBuddyAuth, parseWorkBuddyAuthIdentity, WorkBuddyAccountStore } from '../src/auth.ts'
+import { encryptedWorkBuddyAuthFields, parseWorkBuddyAuth, parseWorkBuddyAuthIdentity, WorkBuddyAccountStore } from '../src/auth.ts'
 import type { WorkBuddyCredits } from '../src/upstream.ts'
 
 const cleanup: string[] = []
@@ -28,6 +28,59 @@ describe('official account edition', () => {
     expect(ultimate?.edition).toBe('education')
     expect(legacy?.edition).toBeUndefined()
     expect(encrypted).toEqual({ uid: 'desktop-user', edition: 'personal' })
+  })
+})
+
+describe('encrypted desktop auth file', () => {
+  const plain = (): string => JSON.stringify({
+    auth: { accessToken: 'plain-token', refreshToken: 'plain-refresh', expiresAt: 4_102_444_800, domain: 'www.codebuddy.cn' },
+    account: { uid: 'plain-user', nickname: 'Plain' },
+  })
+  const sealed = (): string => JSON.stringify({
+    auth: {
+      accessToken: { $wbEncrypted: 1, envelope: 'ciphertext' },
+      refreshToken: { $wbEncrypted: 1, envelope: 'ciphertext' },
+      expiresAt: 4_102_444_800,
+    },
+    account: { uid: 'sealed-user', nickname: 'Aro' },
+  })
+
+  it('names the sealed fields and leaves a plaintext file alone', () => {
+    // The whole point of the report: a sealed token is not a missing one. Before
+    // this, the reader saw a non-string accessToken, returned undefined, and every
+    // caller reported plain "signed out".
+    expect(encryptedWorkBuddyAuthFields(sealed())).toEqual(['auth.accessToken', 'auth.refreshToken'])
+    expect(encryptedWorkBuddyAuthFields(plain())).toEqual([])
+    // The flat document shape gets bare names: it has no `auth` wrapper to name.
+    expect(encryptedWorkBuddyAuthFields(JSON.stringify({
+      accessToken: { $wbEncrypted: 1, envelope: 'ciphertext' },
+      uid: 'flat-user',
+    }))).toEqual(['accessToken'])
+    expect(encryptedWorkBuddyAuthFields('not json')).toEqual([])
+    expect(parseWorkBuddyAuth(sealed())).toBeUndefined()
+  })
+
+  it('reports the sealed fields of the configured desktop file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-workbuddy-ai-auth-'))
+    cleanup.push(dir)
+    const desktopPath = join(dir, 'workbuddy-desktop.info')
+    await writeFile(desktopPath, sealed())
+    const store = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath: join(dir, 'cn-auth.json'),
+      desktopPath,
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    expect(await store.desktopEncryptedFields()).toEqual(['auth.accessToken', 'auth.refreshToken'])
+    // Diagnostics only: the encrypted file still yields no credential.
+    expect(await store.current()).toBeUndefined()
+    const absent = new WorkBuddyAccountStore({
+      region: 'cn',
+      ownPath: join(dir, 'cn-auth.json'),
+      desktopPath: join(dir, 'no-such-file.json'),
+      refresh: async credential => ({ accessToken: credential.accessToken, expiresInSec: 3600 }),
+    })
+    expect(await absent.desktopEncryptedFields()).toEqual([])
   })
 })
 

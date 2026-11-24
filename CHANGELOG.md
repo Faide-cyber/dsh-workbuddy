@@ -13,6 +13,13 @@
 - 刷新失败不动现有目录，继续用上一份快照；上游新增的未知字段宽松忽略，不阻断解析。
 - 测试：新增 `tests/catalog-freshness.spec.ts`（快照往返、坏文件、原子写、抖动区间、`newIds` 只留一代、快照回灌后免费范围仍只剩 `deepseek-v4.1-flash`），20 文件 / 174 全绿；`tsc` 两个工程与 `tsdown` 构建均干净。
 
+### 修复
+
+- **DSH 0.2.3+ 上带图请求整条会话报废：`Image request maxImageBytes must be a positive integer.`（`INVALID_ATTACHMENT_REF`）**。DSH 0.2.3 的 `ResolvedPiAiProviderProfile` 把 `requestImageBudgetCount` 列为必需字段，插件手工拼装的 profile 里没有它。`dsh-llm-pi-ai` 的 `resolveImageRequestBudget()` 用 `floor(maxRequestImageBytes / requestImageBudgetCount / 4) * 3` 分配每张图的字节预算，除数缺失让结果是 `NaN`；`Math.min(NaN, 1 MiB)` 仍是 `NaN`；上游自己的 `maxImageBytes < 1` 守卫也拦不住，因为任何与 `NaN` 的比较都是 `false`。检查发生在附件存储的 `validateTarget()` 里，早于模型调用，所以只要会话历史里有一张图，每一轮都失败。现在补上 `requestImageBudgetCount: 20`，并按 `ResolvedPiAiProviderProfile` 显式列出同样被漏掉的 `maxRequestImages: 50` 与 `imageOffloadCountQuantum: 10`。20 MiB 的请求级预算与 1 MiB 的每图上限不变，纯文本请求不受影响。
+- **桌面端新版把 token 字段包进 `$wbEncrypted` 信封后，只读导入静默失败，卡片只显示「未登录」，说不出原因**。`parseWorkBuddyAuth` 只在 `accessToken` 是字符串时返回凭据，信封对象既不匹配也不报错，于是调用方拿到 `undefined`，走到和「没有任何人登录」一样的分支。现在新增 `encryptedWorkBuddyAuthFields()`：解析出信封里的字段名（`auth.accessToken`、`auth.refreshToken` 等），`doctor` 打印 `desktopAuthFile.encryptedFields` 与对应提示，卡片在未登录区域列出这些字段并指向「连接」。解密不做：信封指名的 AES 密钥只存在于桌面端主进程内存，读另一进程内存不进入本插件。
+- 为什么图片这条类型检查没挡住：仓库仍对着 `dsh-llm-pi-ai@0.2.0-rc.2` 的类型做 `tsc`，那一版还没有这几个字段，而 profile 用 `as ResolvedPiAiProviderProfile` 断言，编译器无从发现。新增 `tests/adapter-image-budget.spec.ts` 从运行时把这条算式钉住：正确 profile 得到正的 safe integer（786 432），缺除数则得到 `NaN` 且 `NaN < 1` 为 `false`。
+- 测试：新增信封字段识别、`desktopEncryptedFields()` 与图片字节预算用例，21 文件 / 177 全绿；`tsc` 两个工程与 `tsdown` 构建均干净。
+
 ## [1.0.24] - 2026-11-14
 
 ### 修复

@@ -152,6 +152,12 @@ interface WorkBuddyWebRegion {
   signedIn: boolean;
   selectedAccountId?: string;
   accounts: readonly WorkBuddyWebAccount[];
+  /**
+   * Fields the desktop app wrote inside a `$wbEncrypted` envelope. Non-empty means
+   * the desktop app is signed in with a key this plugin cannot reach, so a
+   * signed-out region has a cause other than "nobody signed in".
+   */
+  desktopEncryptedFields?: readonly string[];
   models?: readonly WorkBuddyWebModelBadge[];
   probe?: WorkBuddyWebProbeSection;
   scope?: WorkBuddyModelScope$1;
@@ -409,6 +415,11 @@ declare class WorkBuddyCredentialStore implements WorkBuddyCredentialStoreLike {
   private readOwn;
   /** Whether any desktop-file candidate exists as a regular file; diagnostics only. */
   desktopFilePresent(): Promise<boolean>;
+  /**
+   * Encrypted fields in the desktop file, for diagnostics: a non-empty answer
+   * explains a signed-out state that has a signed-in desktop app behind it.
+   */
+  desktopEncryptedFields(): Promise<readonly string[]>;
 }
 /** Token-free account row exposed to the settings card. */
 interface WorkBuddyAccountSummary {
@@ -454,6 +465,8 @@ declare class WorkBuddyAccountStore implements WorkBuddyCredentialStoreLike {
   desktopAuthPath(): string | undefined;
   ownAuthPath(): string;
   accountsAuthPath(): string;
+  /** Encrypted fields in this region's desktop file; see {@link encryptedWorkBuddyAuthFields}. */
+  desktopEncryptedFields(): Promise<readonly string[]>;
   private readAccounts;
   private readPrimary;
   private readDesktopCredential;

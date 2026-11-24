@@ -47,6 +47,7 @@ async function doctor(jsonOutput: boolean): Promise<number> {
   const store = makeStore()
   const status = await store.status()
   const desktopPresent = await store.desktopFilePresent()
+  const encryptedFields = await store.desktopEncryptedFields()
   const heartbeat = await readHostHeartbeat()
   const hostAlive = heartbeat !== undefined && isHeartbeatProcessAlive(heartbeat)
   const report = {
@@ -57,6 +58,7 @@ async function doctor(jsonOutput: boolean): Promise<number> {
     desktopAuthFile: {
       path: store.desktopAuthPath() ?? `(no platform default; set ${WORKBUDDY_AUTH_FILE_ENV})`,
       present: desktopPresent,
+      ...encryptedFields.length === 0 ? {} : { encryptedFields },
     },
     ownAuthFile: workBuddyOwnAuthPath(),
     hostHeartbeat: {
@@ -68,7 +70,9 @@ async function doctor(jsonOutput: boolean): Promise<number> {
     signIn: status.state,
     hints: [
       ...status.state === 'signed-in' ? [] : ['Connect from the plugin card, or run: dsh plugin --profile web exec dsh-workbuddy login'],
-      ...desktopPresent ? [] : ['Desktop auth file is optional; browser OAuth writes the plugin-owned copy instead.'],
+      ...encryptedFields.length > 0
+        ? ['The desktop auth file stores its token fields in $wbEncrypted envelopes; the key lives only in the desktop process, so those fields cannot be imported. Sign in from the plugin card instead.']
+        : desktopPresent ? [] : ['Desktop auth file is optional; browser OAuth writes the plugin-owned copy instead.'],
       ...hostAlive ? [] : ['Host bundle not running in this DSH profile (or the process exited). The browser card and provider are unavailable until DSH starts the plugin.'],
     ],
   }
@@ -78,6 +82,7 @@ async function doctor(jsonOutput: boolean): Promise<number> {
     process.stdout.write([
       `DSH WorkBuddy ${WORKBUDDY_VERSION} on ${process.version}`,
       `Desktop auth file: ${report.desktopAuthFile.present ? 'present' : 'missing'} (${report.desktopAuthFile.path})`,
+      ...encryptedFields.length === 0 ? [] : [`Encrypted desktop fields: ${encryptedFields.join(', ')}`],
       'Model prices: read live from each region\'s own catalog (no local price table)',
       `Host bundle: ${hostAlive ? `running (pid ${heartbeat!.pid})` : heartbeat !== undefined ? 'stale heartbeat (process exited)' : 'not started'}`,
       `Sign-in state: ${report.signIn}`,

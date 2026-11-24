@@ -144,6 +144,12 @@ export interface WorkBuddyWebRegion {
   signedIn: boolean
   selectedAccountId?: string
   accounts: readonly WorkBuddyWebAccount[]
+  /**
+   * Fields the desktop app wrote inside a `$wbEncrypted` envelope. Non-empty means
+   * the desktop app is signed in with a key this plugin cannot reach, so a
+   * signed-out region has a cause other than "nobody signed in".
+   */
+  desktopEncryptedFields?: readonly string[]
   models?: readonly WorkBuddyWebModelBadge[]
   probe?: WorkBuddyWebProbeSection
   scope?: WorkBuddyModelScope
